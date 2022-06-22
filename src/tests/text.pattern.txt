@@ -1,0 +1,2 @@
+# number=1 length=5 file=/home/dominika/Documents/thesis_work/bio-fmi/src/tests/test.txt forbidden=\n
+TGAAATGAGGCACTGACTGAGCCACCCAAA
