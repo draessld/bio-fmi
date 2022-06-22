@@ -19,48 +19,49 @@ namespace bio_fmi
 
     class Bio_FMi
     {
+    private:
+
     public:
-        csa_wt<wt_huff<rrr_vector<127>>, 32, 64, text_order_sa_sampling<>> reference_index_;
-        csa_wt<wt_huff<rrr_vector<127>>, 32, 64, text_order_sa_sampling<>> changes_index_;
+        csa_wt<wt_huff<rrr_vector<127>>, 32, 64, text_order_sa_sampling<>> reference_index_;    //  wavelet tree FM-index structure for reference string
+        csa_wt<wt_huff<rrr_vector<127>>, 32, 64, text_order_sa_sampling<>> changes_index_;  // wavelet tree FM-index structure for concatenation of changes
         
-        select_support_mcl<> sloc_;
-        rank_support_v<> rloc_;
-        rank_support_v<> riloc_;
+        select_support_mcl<> sloc_;     //  select support structure for bit vector loc (1 on every change start)
+        rank_support_v<> rloc_;     //  rank support structure for bit vector loc (1 on every change start)
+        rank_support_v<> riloc_;     //  rank support structure for bit vector iloc (1 on every sequence start hash)
 
-        const unsigned minimal_acceptable_size_ = 6;
+        const unsigned minimal_acceptable_size_ = 6;    //  recommended border for pattern size and context length
 
-        bit_vector iloc_;
-        bit_vector loc_;
+        bit_vector iloc_;   //  bit bector with one on every change start in concatenation of changes
+        bit_vector loc_;    //  bit bector with one on every sequence start in concatenation of changes
     
-        std::string reference_string_;
-        std::string string_of_changes_;
+        std::string reference_string_;  //  reference string
+        std::string string_of_changes_; //  concatenation of chnges
 
         double total_text_size_;
         double total_index_size_;
-        bool is_empty_ = true;
+        bool is_empty_ = true;  //  check if index structure is empty
 
-        unsigned number_of_segments_;
-        unsigned number_of_changes_;
+        unsigned number_of_segments_;   //  number of segments 
+        unsigned number_of_changes_;    //  number of changes 
         
-        bool original_text_change_;
-        std::string new_original_;
+        std::string new_original_;      //  buffer for transformed EDS string
 
-        unsigned context_length_;
-        unsigned current_context_length_;
+        unsigned context_length_;   //  input context length
+        unsigned current_context_length_;   //  current context length - help improve time when the last chunk is smaller - universal distribution of two last chunk to similar size
 
-        std::vector<unsigned> start_possitions_;
-        std::vector<unsigned> base_position_;
-        std::vector<unsigned> change_lengths_;
-        std::vector<int> offset_;
+        std::vector<unsigned> start_possitions_;    //  positions in concatenation of changes, where new sequence starts
+        std::vector<unsigned> base_position_;   //  base postiion of change in reference string
+        std::vector<unsigned> change_lengths_;  //  length of each change
+        std::vector<int> offset_;   //  offset of positions in reference and non-reference sequence - for every change stored
 
         Bio_FMi(unsigned context_length);
         ~Bio_FMi();
 
-        int build();
-        int read_patterns(std::filesystem::path patterns_input_file, std::vector<std::string> &patterns);
-        int save(std::filesystem::path save_path);
-        int load(std::filesystem::path index_path);
-        void print();
+        int build();    //  construct index - WT FM index structures
+        int save(std::filesystem::path save_path);  //  save index files into folder
+        int load(std::filesystem::path index_path); //  load index files from folder
+        void print();   //  print information about index structures
+        int read_patterns(std::filesystem::path patterns_input_file, std::vector<std::string> &patterns);   //  read pattern file in specific format
     };
     
 }

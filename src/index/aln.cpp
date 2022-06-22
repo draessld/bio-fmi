@@ -122,20 +122,19 @@ namespace bio_fmi
         /*  Get the number of change  ->    Rank_loc(i)*/
         unsigned change_number = rloc_(location);
         int difference = location - sloc_(change_number);
-        std::cout << "location:" << location << "change number:" <<change_number << ", difference:" << difference<< std::endl;
+        // std::cout << "location:" << location << "change number:" <<change_number << ", difference:" << difference<< std::endl;
 
         return base_position_[change_number - 1] - offset_[change_number - 1] - change_lengths_[change_number - 1] + difference - 1;
     }
 
     int aln::get_position_in_other_sequence(int location, unsigned sequence_number)
     {
-        int offset = 0;
         int changes_start = rloc_(start_possitions_[sequence_number - 1]);
         int changes_end = rloc_(start_possitions_[sequence_number]) - 1;
         int precending_change_index = std::upper_bound(base_position_.begin() + changes_start, base_position_.begin() + changes_end, location) - base_position_.begin() - 1;
 
-        std::cout <<", start,end" << changes_start << changes_end<< std::endl;
-        std::cout << "pre index change " << precending_change_index << std::endl;
+        // std::cout <<", start,end" << changes_start << changes_end<< std::endl;
+        // std::cout << "pre index change " << precending_change_index << std::endl;
 
         // std::cout << "offset" << offset << "loc" << (location + current_context_length_) << "bool" << ((location + current_context_length_) < offset) << std::endl;
 
@@ -143,14 +142,14 @@ namespace bio_fmi
         if ((location + current_context_length_) + change_lengths_[changes_start] < base_position_[changes_start])
         {
             /*  in first change  */
-            std::cout << "first" << std::endl;
+            // std::cout << "first" << std::endl;
             return location;
         }
 
         if (location >= base_position_[changes_end])
         {
             /*  location is after all changes  */
-            std::cout << "after" << std::endl;
+            // std::cout << "after" << std::endl;
             return location - offset_[changes_end];
         }
 
@@ -222,7 +221,7 @@ namespace bio_fmi
                 }
                 else if (chunk_index == std::round(pattern.size() / context_length_))
                 { //  last chunk
-                std::cout << "last" << std::endl;
+                // std::cout << "last" << std::endl;
                     current_context_length_ = last_context_length;
                     if (chunk_index > 1)
                         chunk_position_offset = (chunk_index - 1) * context_length_ + pre_last_context_length;
@@ -246,13 +245,13 @@ namespace bio_fmi
 
                 /*  SEARCH in changes */
                 auto change_locations = sdsl::locate(changes_index_, chunk);
-                std::cout << "in Id: " << change_locations.size() << std::endl;
+                // std::cout << "in Id: " << change_locations.size() << std::endl;
                 for (auto location : change_locations)
                 {
                     /*  Get the number of sequence  ->  Rank_iloc(i)    */
                     sequence_number = riloc_(location);
                     other_position = get_change_possition(location);
-                    std::cout << "location:" << location << ", sequence number:" << sequence_number << ", other position:" << other_position << ", chunk position offset" << chunk_position_offset << std::endl;
+                    // std::cout << "location:" << location << ", sequence number:" << sequence_number << ", other position:" << other_position << ", chunk position offset" << chunk_position_offset << std::endl;
 
                     if (chunk_index == 0)
                     {
@@ -281,7 +280,7 @@ namespace bio_fmi
                         {
 
                             other_position = get_position_in_other_sequence(location, sequence_number);
-                            std::cout << "location:" << location << ", sequence number:" << sequence_number << ", other position:" << other_position << ", chunk position offset" << chunk_position_offset << std::endl;
+                            // std::cout << "location:" << location << ", sequence number:" << sequence_number << ", other position:" << other_position << ", chunk position offset" << chunk_position_offset << std::endl;
                             if (other_position != -1)
                                 new_set_[sequence_number].insert(other_position);
                         }
@@ -296,7 +295,7 @@ namespace bio_fmi
                         for (sequence_number = 1; sequence_number < number_of_segments_; sequence_number++)
                         {
                             other_position = get_position_in_other_sequence(location, sequence_number);
-                            std::cout << "location:" << location << ", other position:" << other_position << ", chunk position offset" << chunk_position_offset << std::endl;
+                            // std::cout << "location:" << location << ", other position:" << other_position << ", chunk position offset" << chunk_position_offset << std::endl;
 
                             if (other_position != -1)
                             {

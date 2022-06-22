@@ -1,14 +1,5 @@
 #include "eds.h"
 
-/*
- *  TODO
- *
- *
- *
- *
- *
- */
-
 namespace bio_fmi
 {
 
@@ -64,12 +55,12 @@ namespace bio_fmi
         // std::cout << block_number << ',' << first_context_length_ << ',' << last_context_length_ << std::endl;
         // std::cout << pre_hash_loc << ',' << pos_hash_loc << ',' << base_position_[change_number] << ',' << offset_[change_number] << std::endl;
 
-        if (block_number == 0 && (pre_hash_loc + current_context_length_ - 1) <= first_context_length_)
+        if (block_number == 0 && (pre_hash_loc + current_context_length_) <= (first_context_length_ + 1))
         {
             // std::cout << "pre" << std::endl;
             return -1;
         }
-        else if ((block_number - 1) == number_of_segments_ && (pos_hash_loc - current_context_length_) < last_context_length_)
+        else if ((block_number - 1) == number_of_segments_ && pos_hash_loc < (last_context_length_ + current_context_length_))
         {
             // std::cout << "pos" << std::endl;
             return -1;
@@ -153,7 +144,7 @@ namespace bio_fmi
                 auto ref_locations = sdsl::locate(reference_index_, chunk);
                 // std::cout << "in I0: " << ref_locations.size() << std::endl;
 
-                for (int l = 0; l < (ref_locations.size() + change_locations.size()); l++)
+                for (size_t l = 0; l < (ref_locations.size() + change_locations.size()); l++)
                 {
                     if (l >= ref_locations.size())
                     {

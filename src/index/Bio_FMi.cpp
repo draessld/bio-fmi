@@ -57,7 +57,6 @@ namespace bio_fmi
         std::ifstream input_file(patterns_input_file);
         if (!input_file.is_open())
         {
-            // parameters.errorExitCode = -1;  //  TODO jaka bude chyba
             return -1;
         }
 
@@ -111,9 +110,9 @@ namespace bio_fmi
             store_to_file(base_position_, save_path / filename.replace_extension(".abp"));
             store_to_file(offset_, save_path / filename.replace_extension(".aof"));
 
-            if (original_text_change_)
+            if (!new_original_.empty())
             {
-                std::cout << "saving new original text to: " << filename.replace_extension(".reposition.eds") << std::endl;
+                std::cout << "saving new original text to: " << filename.replace_extension(".reposition") << std::endl;
                 std::ofstream outfile(save_path / filename);
                 if (!outfile.is_open())
                 {
