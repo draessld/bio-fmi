@@ -10,11 +10,6 @@ namespace bio_fmi
             for (auto a : add)
                 res.push_back(b + a);
 
-        // for (auto r : res)
-        // {
-        //     std::cout << r << std::endl;
-        // }
-
         return res;
     }
 
@@ -52,24 +47,16 @@ namespace bio_fmi
 
     int eds::get_change_possition(unsigned location, unsigned block_number, unsigned change_number, unsigned pre_hash_loc, unsigned pos_hash_loc)
     {
-        // std::cout << block_number << ',' << first_context_length_ << ',' << last_context_length_ << std::endl;
-        // std::cout << pre_hash_loc << ',' << pos_hash_loc << ',' << base_position_[change_number] << ',' << offset_[change_number] << std::endl;
 
         if (block_number == 0 && (pre_hash_loc + current_context_length_) <= (first_context_length_ + 1))
         {
-            // std::cout << "pre" << std::endl;
             return -1;
         }
         else if ((block_number - 1) == number_of_segments_ && pos_hash_loc < (last_context_length_ + current_context_length_))
         {
-            // std::cout << "pos" << std::endl;
             return -1;
         }
         else
-            // if ((((pos_hash_loc+1-context_length_) < location) && (string_of_changes_[pos_hash_loc-1] != '$')) || (((pre_hash_loc+current_context_length_-1) < context_length_) && (block_number != 0))){
-            //     std::cout << "other" << std::endl;
-            //     return -1;
-            // }
 
             return base_position_[change_number] + offset_[change_number] - pos_hash_loc;
     }
@@ -128,7 +115,6 @@ namespace bio_fmi
                 {
                     chunk_position_offset = chunk_index * context_length_;
                 }
-                // chunk_position_offset = chunk_index * current_context_length_;
 
                 chunk = pattern.substr(chunk_position_offset, current_context_length_);
                 if (chunk.empty())
@@ -148,7 +134,6 @@ namespace bio_fmi
                 {
                     if (l >= ref_locations.size())
                     {
-                        // std::cout << change_locations[l-ref_locations.size()] << " : CHANGE" << std::endl;
 
                         other_position = change_locations[l - ref_locations.size()];
                         block_number = riloc_(other_position);
@@ -156,7 +141,6 @@ namespace bio_fmi
                         pre_hash_loc = other_position - sloc_(change_number + 1);
                         pos_hash_loc = sloc_(change_number + 2) - other_position;
 
-                        // std::cout << pre_hash_loc << ',' << pos_hash_loc << ',' << base_position_[change_number] << ',' << offset_[change_number] << std::endl;
                         other_position = get_change_possition(other_position, block_number - 1, change_number - 1, other_position - pre_hash_loc, pos_hash_loc - other_position);
                         if (other_position == -1) // do not save change in contexts parts again - found in reference
                             continue;
@@ -164,7 +148,6 @@ namespace bio_fmi
                     }
                     else
                     {
-                        // std::cout << ref_locations[l] << " : REF" << std::endl;
 
                         block_number = 0;
                         change_number = 0;
@@ -172,41 +155,29 @@ namespace bio_fmi
                         offset = 0;
                     }
 
-                    // std::cout << "Location: " << other_position << ", block_number: " << block_number; // << ", change_number: " << change_number << ", offset: " << offset << ", chunk possition: " << chunk_position_offset << std::endl;
 
                     if (chunk_index == 0)
                     {
                         new_set_.push_back({other_position, offset, change_number});
-                        //     // location_r->sequences.push_back(change_number);
-                        //     // std::cout << "here" << std::endl;
-                        //     // location_r->location = other_position;
-                        //     // location_r->offset = offset;
-                        //     // new_set_.push_back(location_r);
                     }
                     else
                     {
                         /*  VALIDATION  */
-                        // std::cout << old_set_.size() << std::endl;
                         for (auto loc : old_set_)
                         {
 
-                            // std::cout << loc->location << ", " << loc->offset << ", " << chunk_position_offset << ", " << loc->sequences.back()<< std::endl;
                             if (loc.back() == change_number || change_number == 0)
                             {
-                                // std::cout << "a";
                                 if ((other_position + loc[1] - offset - chunk_position_offset) == loc[0])
                                 {
-                                    // std::cout << " - yes" << std::endl;
                                     new_set_.push_back(loc);
                                 }
                             }
 
                             if (loc.back() < change_number)
                             {
-                                // std::cout << "b";
                                 if ((other_position + loc[1] - chunk_position_offset) == loc[0])
                                 {
-                                    // std::cout << " - yes" << std::endl;
                                     loc[1] += offset;
                                     loc.push_back(change_number);
 
@@ -220,18 +191,6 @@ namespace bio_fmi
                 std::swap(old_set_, new_set_);
                 new_set_.clear();
 
-                /*  print results   */
-                // for (auto loc : old_set_)
-                // {
-                //     std::cout << "      " << loc[0] << ',' << loc[1] << ": [";
-                //     for (size_t i = 2; i < loc.size(); i++)
-                //     {
-                //         std::cout << loc[i] << ',';
-                //     }
-                //     std::cout << ']' << std::endl;
-                // }
-
-                // std::cout << "  total: " << old_set_.size() << std::endl;
             }
 
             if (!silent)
@@ -308,16 +267,11 @@ namespace bio_fmi
                 {
                     original_text_change_ = true;
                     std::string appending = reference_string_.substr(block_end_possition - 1, r_index - block_end_possition + 1);
-                    // std::cout << "appending " << appending << ", starting on: " << block_end_possition << ", length: " << (r_index - block_end_possition) << std::endl;
                     for (auto c : changes)
                     {
                         changes_base.push_back(c + appending);
-                        // std::cout << c + appending << std::endl;
                     }
-                    // if (pre_ref_length != -1)
-                    //     pre_ref_length += appending.size();
 
-                    // post_ref_length = appending.size();
                     changes.clear();
                     r_context.clear();
                 }
@@ -331,7 +285,6 @@ namespace bio_fmi
                     {
                         l_context = reference_string_.substr(0, r_index);
                     }
-                    // std::cout << "setting r-context of " << reference_string_ << ", on "<< r_index << "=" << l_context<< std::endl;
                     start_possitions_.push_back(s_index - 1);
                 }
                 if (first_context_length_ == -1)
@@ -357,8 +310,6 @@ namespace bio_fmi
                     changes.push_back(change);
                     reference_string_ += change;
                     r_index += change.size();
-                    // if (pre_ref_length == -1)
-                    //     pre_ref_length = change.size();
                     change.clear();
                     save_ref = false;
                 }
@@ -374,8 +325,6 @@ namespace bio_fmi
                     change.clear();
                     if (!changes_base.empty())
                     {
-                        // if (post_ref_length != -1)
-                        //     post_ref_length += changes[0].size();
                         changes = find_cartez(changes_base, changes);
                     }
                 }
@@ -416,14 +365,12 @@ namespace bio_fmi
 
             if ((open_change && (r_context.size() == (context_length_ - 1))) || character == '$')
             {
-                // std::cout << "saving changes" << std::endl;
                 if (changes.size() == 0)
                 {
                     open_change = false;
                     break;
                 }
                 new_original_ += '{';
-                // std::cout << "r_index: " << r_index << ", reference: " << reference_string_ << std::endl;
 
                 new_original_ += changes[0];
                 ref_change = changes[0];
@@ -434,10 +381,6 @@ namespace bio_fmi
                     new_original_ += changes[i];
                     pre_ref_length = get_lcp(ref_change, changes[i]);
                     post_ref_length = get_lcs(ref_change, changes[i]);
-                    // std::cout << i << ": " << changes[i] << ", " << changes[0] << std::endl;
-                    // std::cout << "ref length: " << pre_ref_length << ',' << post_ref_length << std::endl;
-                    // std::cout << l_context << std::endl;
-                    // std::cout << r_context << std::endl;
 
                     offset_.push_back(changes[i].size() - changes[0].size());
 
@@ -460,7 +403,6 @@ namespace bio_fmi
                     /* cut r-context by */
                     if (post_ref_length >= (context_length_ - 1))
                     {
-                        // std::cout << 'd' << std::endl;
                         string_of_changes_ = string_of_changes_.substr(0, string_of_changes_.size() + context_length_ - post_ref_length - 2);
                         base_position_.push_back(r_index - post_ref_length - 1 + offset_.back());
                     }
@@ -468,23 +410,19 @@ namespace bio_fmi
                     {
                         if (r_context.size() + post_ref_length < context_length_)
                         {
-                            // std::cout << 'e' << std::endl;
                             string_of_changes_ += r_context;
                             base_position_.push_back(r_index);
                         }
                         else
                         {
-                            // std::cout << 'f' << std::endl;
                             string_of_changes_ += r_context.substr(0, r_context.size() - post_ref_length);
                             base_position_.push_back(r_index - post_ref_length);
                         }
                     }
 
                     string_of_changes_ += '#';
-                    // std::cout << string_of_changes_ << std::endl;
                     s_index = string_of_changes_.size();
                     number_of_changes_++;
-                    // base_position_.push_back(r_index-post_ref_length -1 + (changes[i].size() - changes[0].size()) );
                 }
                 new_original_ += '}';
                 new_original_ += r_context;
@@ -516,7 +454,6 @@ namespace bio_fmi
             iloc_[i] = 1;
 
 
-        // std::cout << new_original_ << std::endl;
         return 0;
     }
 

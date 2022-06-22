@@ -6,9 +6,6 @@ namespace bio_fmi
     Bio_FMi::Bio_FMi(unsigned context_length)
         : context_length_(context_length){
             original_text_change_ = false;
-            select_support_mcl<> sloc_;
-            rank_support_v<> rloc_;
-            rank_support_v<> riloc_;
         }
 
     Bio_FMi::~Bio_FMi() {
