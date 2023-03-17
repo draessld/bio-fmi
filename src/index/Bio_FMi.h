@@ -40,6 +40,7 @@ namespace bio_fmi
         double total_text_size_;
         double total_index_size_;
         bool is_empty_ = true;  //  check if index structure is empty
+        bool original_text_change_ = false;
 
         unsigned number_of_segments_;   //  number of segments 
         unsigned number_of_changes_;    //  number of changes 
