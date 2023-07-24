@@ -4,10 +4,10 @@
 
 #include "utils/Informations_signs.h"
 #include "utils/Config.h"
-#include "index/aln.h"
 #include "index/eds.h"
 
 #include <boost/program_options.hpp>
+#define BLOCK_SIZE 256
 
 /*
  *
@@ -23,23 +23,23 @@ namespace po = boost::program_options;
 Informations_signs inf;
 Config cfg;
 
-long get_mem_usage()
-{
-    struct rusage myusage;
+// long get_mem_usage()
+// {
+//     struct rusage myusage;
 
-    getrusage(RUSAGE_SELF, &myusage);
-    return myusage.ru_maxrss;
-}
+//     getrusage(RUSAGE_SELF, &myusage);
+//     return myusage.ru_maxrss;
+// }
 
-double get_time_usage()
-{
-    struct rusage myusage;
+// double get_time_usage()
+// {
+//     struct rusage myusage;
 
-    getrusage(RUSAGE_SELF, &myusage);
-    double system_time = (double)myusage.ru_stime.tv_sec + (double)myusage.ru_stime.tv_usec / 1000000.0;
-    double user_time = (double)myusage.ru_utime.tv_sec + (double)myusage.ru_utime.tv_usec / 1000000.0;
-    return system_time + user_time;
-}
+//     getrusage(RUSAGE_SELF, &myusage);
+//     double system_time = (double)myusage.ru_stime.tv_sec + (double)myusage.ru_stime.tv_usec / 1000000.0;
+//     double user_time = (double)myusage.ru_utime.tv_sec + (double)myusage.ru_utime.tv_usec / 1000000.0;
+//     return system_time + user_time;
+// }
 
 int handle_parameters(int argc, const char **argv)
 {
@@ -123,34 +123,23 @@ void run()
     std::vector<double> times;
     std::vector<long> mems;
 
+    std::filesystem::path input_path = "/home/draesdom/Documents/projects/bio-fmi/src/tests/test1/input.eds"; 
+
+    //  parse input
     T *index = new T(cfg.context_length);
-    index->read(cfg.index_input_path);
+    index->parse(input_path,BLOCK_SIZE);
+    
+    // index->build();
 
-    for (int i = 0; i < cfg.repetition; i++)
-    {
-        mem_baseline = get_mem_usage();
-        time_baseline = get_time_usage();
+    // index->save();
 
-        index->build();
-
-        times.push_back((get_time_usage() - time_baseline));
-        mems.push_back((get_mem_usage() - time_baseline));
-    }
-
-    std::cout << "Build time: " << std::reduce(times.begin(), times.end()) / cfg.repetition << std::endl;
-    std::cout << "Peak RAM usage: " << std::reduce(mems.begin(), mems.end()) / cfg.repetition << " kB" << std::endl;
-
-    if (!cfg.silent)
-    {
-        index->print();
-    }
-    index->save(cfg.index_output_path);
 }
+
 
 int main(int argc, char const *argv[])
 {
     // ru_maxrss
-    /*  Parse input command line */
+    /*  Handle input parameters */
     int parameter_handle_result = handle_parameters(argc, argv);
     if (parameter_handle_result == -1)
     {
@@ -163,24 +152,116 @@ int main(int argc, char const *argv[])
         return EXIT_SUCCESS;
     }
 
-    if (cfg.index_input_path.extension() == ".aln")
-    {
-        cfg.type = inf.ALN;
-        run<aln>();
-    }
+
+    /*  Run Experiments */
+    // we expect input file as eds format
+    //TODO - no dependency on file extension .eds but validation during the parsing
     else if (cfg.index_input_path.extension() == ".eds")
     {
-        cfg.type = inf.EDS;
         run<eds>();
     }
     else
     {
-        std::cout << "Unknown input format - use extension .aln or .eds" << std::endl;
+        std::cout << "Unknown input format - use extension .eds" << std::endl;
         return EXIT_FAILURE;
     }
 
     /*  save configuration  */
-    cfg.save();
+    // cfg.save();
 
     return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
+/*  OLD STUFFS  */
+// int main_old(int argc, char const *argv[])
+// {
+//     // ru_maxrss
+//     /*  Parse input command line */
+//     int parameter_handle_result = handle_parameters(argc, argv);
+//     if (parameter_handle_result == -1)
+//     {
+//         std::cout << "Error while reading parameters\n"
+//                   << std::endl;
+//         return EXIT_FAILURE;
+//     }
+//     else if (parameter_handle_result == 1)
+//     {
+//         return EXIT_SUCCESS;
+//     }
+
+//     if (cfg.index_input_path.extension() == ".aln")
+//     {
+//         cfg.type = inf.ALN;
+//         run<aln>();
+//     }
+//     else if (cfg.index_input_path.extension() == ".eds")
+//     {
+//         cfg.type = inf.EDS;
+//         run<eds>();
+//     }
+//     else
+//     {
+//         std::cout << "Unknown input format - use extension .aln or .eds" << std::endl;
+//         return EXIT_FAILURE;
+//     }
+
+//     /*  save configuration  */
+//     cfg.save();
+
+//     return 0;
+// }
+
+// template <typename T>
+// void run_old()
+// {
+
+//     double time_baseline;
+//     long mem_baseline;
+//     std::vector<double> times;
+//     std::vector<long> mems;
+
+//     T *index = new T(cfg.context_length);
+//     // read input file
+
+//     mem_baseline = get_mem_usage();
+//     time_baseline = get_time_usage();
+
+//     index->read(cfg.index_input_path);
+
+
+//     double read_time = (get_time_usage() - time_baseline);
+//     std::cout << "read time: " << read_time << std::endl;
+//     std::cout << "read Peak RAM usage: " << (get_mem_usage() - time_baseline) << " kB" << std::endl;
+
+//     for (int i = 0; i < cfg.repetition; i++)
+//     {
+//         mem_baseline = get_mem_usage();
+//         time_baseline = get_time_usage();
+
+//         index->build();
+
+//         times.push_back((get_time_usage() - time_baseline));
+//         mems.push_back((get_mem_usage() - time_baseline));
+//     }
+
+//     double build_time = std::reduce(times.begin(), times.end()) / cfg.repetition;
+//     std::cout << "Build time: " << build_time << std::endl;
+//     std::cout << "Total: " << read_time+build_time << "in rate: (" << (read_time*100/(read_time+build_time)) << "," << (build_time*100/(read_time+build_time)) << ")" << std::endl;
+//     std::cout << "Peak RAM usage: " << std::reduce(mems.begin(), mems.end()) / cfg.repetition << " kB" << std::endl;
+
+//     if (!cfg.silent)
+//     {
+//         index->print();
+//     }
+//     index->save(cfg.index_output_path);
+// }

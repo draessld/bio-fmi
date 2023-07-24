@@ -7,7 +7,7 @@
 
 struct Informations_signs
 {
-    const std::string versionInfo = "bio-fmi v1.0";
+    const std::string versionInfo = "bio-fmi v1.1";
     const std::string buildUsageInfoString = "[options] <input_file_name>";
     const std::string locateUsageInfoString = "[options] <index_basename> <pattern_file>";
     const std::string usageInfoString = "[options] <index_basename> <pattern_file>";
@@ -31,9 +31,6 @@ struct Informations_signs
         std::cout << "Index will be saved to " << output << std::endl;
     }
     const std::string search_information_sign = "Searching pattern";
-
-    const unsigned ALN = 0;
-    const unsigned EDS = 1;
 };
 
 #endif // INFORMATIONS_SIGNS_H

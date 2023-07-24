@@ -3,6 +3,43 @@
 namespace bio_fmi
 {
 
+    // private methods
+    int eds::delete_file(std::filesystem::path what)
+    {
+        // Delete the file if it exists
+        if (std::filesystem::remove_all(what) == 0)
+        {
+            std::cout << "File " << what << " deleted successfully." << std::endl;
+            return 0;
+        }
+        else
+        {
+            std::cout << "File " << what << " does not exist or could not be deleted." << std::endl;
+            return 1;
+        }
+    }
+
+    int eds::flush(const char *start, size_t size, std::ofstream &out_file)
+    {        
+        out_file.write(start, size);
+        return 0;
+    }
+
+    void eds::print(std::string s)
+    {
+        std::cout << s << std::endl;
+    }
+
+    template <typename T>
+    void eds::print_v(std::vector<T> v)
+    {
+        for (const auto &i : v)
+        {
+            std::cout << i << " ";
+        }
+        std::cout << std::endl;
+    }
+
     std::vector<std::string> eds::find_cartez(std::vector<std::string> base, std::vector<std::string> add)
     {
         std::vector<std::string> res;
@@ -61,6 +98,176 @@ namespace bio_fmi
             return base_position_[change_number] + offset_[change_number] - pos_hash_loc;
     }
 
+    int eds::parse_block(std::string buffer)
+    {
+        print_v(std::vector<char>(buffer.data(), buffer.data() + buffer.size()));
+        //  first cross - get basic information
+        std::vector<unsigned> start_b;
+        std::vector<unsigned> end_b;
+        std::vector<unsigned> number_of_change;
+        std::vector<unsigned> lenght_of_change;
+        std::vector<unsigned> change_position;
+        unsigned len = 0;
+        unsigned minimal_right_context = buffer.size();
+        unsigned context_length;
+
+        std::filesystem::path reference = "/home/draesdom/Documents/projects/bio-fmi/src/tests/test1/reference.peds";
+
+        // std::ofstream reference_f(reference, std::ofstream::app);
+        std::ofstream reference_f(reference, std::ofstream::out);
+
+        if (!reference_f)
+        {
+            std::cerr << "Failed to open the reference file." << std::endl;
+            return 1;
+        }
+
+        std::filesystem::path changes = "/home/draesdom/Documents/projects/bio-fmi/src/tests/test1/changes.peds";
+        std::ofstream changes_f(changes, std::ofstream::out);
+        // std::ofstream changes_f(changes, std::ofstream::app);
+
+        if (!changes_f)
+        {
+            std::cerr << "Failed to open the changes file." << std::endl;
+            return 1;
+        }
+
+        // find starts of degenerate symbols
+        for (size_t i = 0; i != buffer.size(); i++)
+        {
+            switch (buffer[i])
+            {
+            case '{':
+                if(context_length < minimal_right_context){
+                    minimal_right_context = context_length;
+                }
+                start_b.push_back(i);
+                if (number_of_change.empty())
+                {
+                    number_of_change.push_back(0);
+                }
+                else
+                {
+                    number_of_change.push_back(number_of_change.back());
+                }
+                change_position.push_back(i);
+                len = 0;
+                break;
+            case '}':
+                context_length = 0;
+                end_b.push_back(i);
+                number_of_change.back()++;
+                lenght_of_change.push_back(len);
+                len = 0;
+                break;
+            case ',':
+                change_position.push_back(i);
+                number_of_change.back()++;
+                lenght_of_change.push_back(len);
+                len = 0;
+                break;
+            default:
+                context_length++;
+                len++;
+                break;
+            }
+        }
+
+        if (minimal_right_context < context_length_)
+        {
+            context_length_ = minimal_right_context;
+        }
+        
+
+        unsigned start_len = 0;
+        unsigned end_len = 0;
+        bool sb_empty = start_b.empty();
+        bool eb_empty = end_b.empty();
+
+        if (!sb_empty)
+            start_len = start_b.front();
+        if (!eb_empty)
+            end_len = buffer.size() - end_b.back();
+
+        std::cout << "context_length: " << context_length_ << std::endl;
+        std::cout << "start_len: " << start_len << std::endl;
+        std::cout << "end_len: " << end_len << std::endl;
+        print_v(start_b);
+        print_v(end_b);
+        print_v(number_of_change);
+        print_v(lenght_of_change);
+        print_v(change_position);
+
+        std::string left_context;
+        std::string right_context;
+
+        char divider = '#';
+        size_t j = 0;
+        bool first;
+
+        //  najdi v bloku vsechny kompletni DS = k { existuje }
+        for (size_t i = 0; i < start_b.size(); i++)
+        {
+            //  flush reference
+            if (i == 0)
+            {
+                flush(buffer.c_str(), start_b[i], reference_f);
+            }
+            else
+            {
+                flush(buffer.c_str() + end_b[i - 1] + 1, start_b[i] - end_b[i - 1] - 1, reference_f);
+            }
+            // std::cout << start_b[i] << " - " << end_b[i] << std::endl;
+            // std::cout << "left context " << buffer.substr(start_b[i] - context_length_, context_length_);
+            // std::cout << ", right context " << buffer.substr(end_b[i] + 1, context_length_) << std::endl;
+            // std::cout << "total changes do far: " << number_of_change[i] << std::endl;
+            first = true;
+            for (j; j < number_of_change[i]; j++)
+            {
+                // std::cout << "  length: " << lenght_of_change[j] << ", starting on position: " << change_position[j] << ", change: " << buffer.substr(change_position[j] + 1, lenght_of_change[j]);
+                if (first)
+                { // first change = reference change
+                    std::cout << " - reference!";
+                    first ^= first;
+                    flush(buffer.c_str() + change_position[j] + 1, lenght_of_change[j], reference_f);
+                }else{
+                    //  divider
+                    flush(&divider,1,changes_f);
+
+                    //  left_context                    
+                    //  check if left context is long enough
+                    if(start_b[i]-context_length_ < 0){
+                        //  we are in the beginning of EDS
+                        flush(buffer.c_str(),context_length_-start_b[i],changes_f);
+                    }else{
+                        flush(buffer.c_str()+start_b[i]-context_length_+1,context_length_-1,changes_f);
+                    }
+
+                    //  change
+                    flush(buffer.c_str()+change_position[j]+1, lenght_of_change[j],changes_f);
+                    
+                    
+                    //  right_context                    
+                    //  check if right context is long enough
+                    if(end_b[i]+context_length_ > buffer.size()){
+                        //  we are in the end of EDS
+                        flush(buffer.c_str()+end_b[i]+1,buffer.size() - end_b[i],changes_f);
+                    }else{
+                        flush(buffer.c_str()+end_b[i]+1,context_length_-1,changes_f);
+                    }
+                }
+                // std::cout << std::endl;
+            }
+        }
+
+        reference_f.close();
+        changes_f.close();
+
+
+        return 0;
+    }
+
+    // public methods
     int eds::search(std::string pattern, bool silent)
     {
 
@@ -155,7 +362,6 @@ namespace bio_fmi
                         offset = 0;
                     }
 
-
                     if (chunk_index == 0)
                     {
                         new_set_.push_back({other_position, offset, change_number});
@@ -190,7 +396,6 @@ namespace bio_fmi
 
                 std::swap(old_set_, new_set_);
                 new_set_.clear();
-
             }
 
             if (!silent)
@@ -219,7 +424,7 @@ namespace bio_fmi
         return -1;
     }
 
-    int eds::read(std::filesystem::path text_input_file)
+    int eds::read(std::filesystem::path input_path)
     {
         std::cout << "reading eds" << std::endl;
 
@@ -227,7 +432,7 @@ namespace bio_fmi
         number_of_changes_ = 0;
 
         /*  open file   */
-        std::ifstream input_file(text_input_file);
+        std::ifstream input_file(input_path);
         if (!input_file.is_open())
         {
             return -1;
@@ -453,8 +658,40 @@ namespace bio_fmi
         for (auto i : start_possitions_)
             iloc_[i] = 1;
 
-
         return 0;
+    }
+
+    int eds::parse(std::filesystem::path input_path, const int BLOCK_SIZE)
+    {
+        std::ifstream input_file(input_path, std::ios::binary);
+
+        if (!input_file)
+        {
+            std::cerr << "Failed to open the input file." << std::endl;
+            return 1;
+        }
+
+        buffer_.resize(BLOCK_SIZE);
+
+        int counter = 0;
+        // Read and process data in blocks
+        while (input_file.read(buffer_.data(), BLOCK_SIZE))
+        {
+            std::size_t bytesRead = input_file.gcount(); // Number of bytes read
+            counter++;
+            // Process the block
+            parse_block(std::string(buffer_.begin(), buffer_.begin() + bytesRead));
+        }
+        std::cout << "counter: " << counter << std::endl;
+
+        // Process the remaining data (if any)
+        std::size_t bytesRead = input_file.gcount(); // Number of bytes read after the last block
+        if (bytesRead > 0)
+        {
+            parse_block(std::string(buffer_.begin(), buffer_.begin() + bytesRead));
+        }
+
+        input_file.close();
     }
 
 }

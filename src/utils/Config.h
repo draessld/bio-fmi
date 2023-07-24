@@ -9,7 +9,6 @@ class Config
 {
 public:
 
-    unsigned type;
     unsigned context_length = 6;
     std::filesystem::path index_input_path;
     std::filesystem::path index_output_path;
@@ -37,7 +36,7 @@ int Config::save(){
         return -1;
     }
 
-    file << type << ' ' << context_length;
+    file << context_length;
     file.close();
     return 0;
 }
@@ -50,7 +49,7 @@ int Config::load(){
         return -1;
     }
     
-    file >> type >> context_length;
+    file >> context_length;
 
     return 0;
 }
