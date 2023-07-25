@@ -30,7 +30,6 @@ private:
     int first_context_length_;  //  length of first context - could be smaller than context length
     int last_context_length_;   //  length of last context - could be smaller than context length
 
-
     std::string buffer_; 
 
 public:

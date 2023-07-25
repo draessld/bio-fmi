@@ -1,5 +1,7 @@
 #include "eds.h"
 
+#define MAX(a,b) ((a)>(b)?(a):(b))
+
 namespace bio_fmi
 {
 
@@ -107,9 +109,10 @@ namespace bio_fmi
         std::vector<unsigned> number_of_change;
         std::vector<unsigned> lenght_of_change;
         std::vector<unsigned> change_position;
+        std::vector<unsigned> contexts;
         unsigned len = 0;
         unsigned minimal_right_context = buffer.size();
-        unsigned context_length;
+        unsigned context_length = 0;
 
         std::filesystem::path reference = "/home/draesdom/Documents/projects/bio-fmi/src/tests/test1/reference.peds";
 
@@ -138,9 +141,12 @@ namespace bio_fmi
             switch (buffer[i])
             {
             case '{':
-                if(context_length < minimal_right_context){
-                    minimal_right_context = context_length;
+                if ((context_length_-1)>context_length){
+                    contexts.push_back(context_length);
+                }else{
+                    contexts.push_back(0);
                 }
+
                 start_b.push_back(i);
                 if (number_of_change.empty())
                 {
@@ -159,6 +165,7 @@ namespace bio_fmi
                 number_of_change.back()++;
                 lenght_of_change.push_back(len);
                 len = 0;
+                number_of_segments_++;
                 break;
             case ',':
                 change_position.push_back(i);
@@ -172,40 +179,26 @@ namespace bio_fmi
                 break;
             }
         }
-
-        if (minimal_right_context < context_length_)
-        {
-            context_length_ = minimal_right_context;
+        if ((context_length_-1)>context_length){
+            contexts.push_back(context_length);
+        }else{
+            contexts.push_back(0);
         }
-        
-
-        unsigned start_len = 0;
-        unsigned end_len = 0;
-        bool sb_empty = start_b.empty();
-        bool eb_empty = end_b.empty();
-
-        if (!sb_empty)
-            start_len = start_b.front();
-        if (!eb_empty)
-            end_len = buffer.size() - end_b.back();
 
         std::cout << "context_length: " << context_length_ << std::endl;
-        std::cout << "start_len: " << start_len << std::endl;
-        std::cout << "end_len: " << end_len << std::endl;
+        std::cout << "number_of_segments: " << number_of_segments_ << std::endl;
         print_v(start_b);
         print_v(end_b);
         print_v(number_of_change);
         print_v(lenght_of_change);
         print_v(change_position);
-
-        std::string left_context;
-        std::string right_context;
+        print_v(contexts);
 
         char divider = '#';
         size_t j = 0;
         bool first;
 
-        //  najdi v bloku vsechny kompletni DS = k { existuje }
+        //  pro kazdy blok
         for (size_t i = 0; i < start_b.size(); i++)
         {
             //  flush reference
@@ -217,46 +210,66 @@ namespace bio_fmi
             {
                 flush(buffer.c_str() + end_b[i - 1] + 1, start_b[i] - end_b[i - 1] - 1, reference_f);
             }
-            // std::cout << start_b[i] << " - " << end_b[i] << std::endl;
-            // std::cout << "left context " << buffer.substr(start_b[i] - context_length_, context_length_);
-            // std::cout << ", right context " << buffer.substr(end_b[i] + 1, context_length_) << std::endl;
-            // std::cout << "total changes do far: " << number_of_change[i] << std::endl;
+            
+            //  flush changes
             first = true;
             for (j; j < number_of_change[i]; j++)
             {
-                // std::cout << "  length: " << lenght_of_change[j] << ", starting on position: " << change_position[j] << ", change: " << buffer.substr(change_position[j] + 1, lenght_of_change[j]);
                 if (first)
                 { // first change = reference change
-                    std::cout << " - reference!";
                     first ^= first;
                     flush(buffer.c_str() + change_position[j] + 1, lenght_of_change[j], reference_f);
                 }else{
-                    //  divider
-                    flush(&divider,1,changes_f);
+                    if(contexts[i+1] == 0 || i == number_of_segments_-1){
+                        std::cout << "tuto zmenu dokoncime standartne" << std::endl;
+                        //  divider
+                        flush(&divider,1,changes_f);
 
-                    //  left_context                    
-                    //  check if left context is long enough
-                    if(start_b[i]-context_length_ < 0){
-                        //  we are in the beginning of EDS
-                        flush(buffer.c_str(),context_length_-start_b[i],changes_f);
-                    }else{
-                        flush(buffer.c_str()+start_b[i]-context_length_+1,context_length_-1,changes_f);
-                    }
+                        //  left_context                    
+                        if(i==0)  //  are we in the beginning of EDS
+                            flush(buffer.c_str(),contexts[i],changes_f);
+                        else if(contexts[i] != 0)
+                            flush(buffer.c_str()+start_b[i]-contexts[i],contexts[i],changes_f);
+                        else
+                            flush(buffer.c_str()+start_b[i]-context_length_+1,context_length_-1,changes_f);
 
-                    //  change
-                    flush(buffer.c_str()+change_position[j]+1, lenght_of_change[j],changes_f);
-                    
-                    
-                    //  right_context                    
-                    //  check if right context is long enough
-                    if(end_b[i]+context_length_ > buffer.size()){
-                        //  we are in the end of EDS
-                        flush(buffer.c_str()+end_b[i]+1,buffer.size() - end_b[i],changes_f);
+                        //  change
+                        flush(buffer.c_str()+change_position[j]+1, lenght_of_change[j],changes_f);
+
+                        //  right_context  
+                        if(i == number_of_segments_-1)    //  are we in the end of EDS
+                            flush(buffer.c_str()+end_b[i]+1,contexts[i+1],changes_f);
+                        else                 
+                            flush(buffer.c_str()+end_b[i]+1,context_length_-1,changes_f);
                     }else{
-                        flush(buffer.c_str()+end_b[i]+1,context_length_-1,changes_f);
+                        std::cout << "tuto zmenu rozsirujeme pouze pro pravy context" << std::endl;
+                        
+                        //  size of left and right blocks
+                        for (size_t r = number_of_change[i]; r < number_of_change[i+1]; r++){
+                            //  divider
+                            flush(&divider,1,changes_f);
+
+                            //  left_context    
+                            if(contexts[i] != 0)  //  are we in the beginning of EDS
+                                flush(buffer.c_str()+start_b[i]-contexts[i],contexts[i],changes_f);
+                            else
+                                flush(buffer.c_str()+start_b[i]-context_length_+1,context_length_-1,changes_f);
+
+                            //  change
+                            flush(buffer.c_str()+change_position[j]+1, lenght_of_change[j],changes_f);
+
+                            //  right_context
+                             
+                            if(i == number_of_segments_)    //  are we in the end of EDS
+                                flush(buffer.c_str()+end_b[i]+1,buffer.size() - end_b[i],changes_f);
+                            else{
+                                flush(buffer.c_str()+end_b[i]+1,contexts[i+1],changes_f);   //  the maximal possible common context
+                                //
+                                flush(buffer.c_str()+change_position[r]+1, context_length_-contexts[i+1]-1,changes_f); //  tha part of change from next block
+                            }
+                        }
                     }
                 }
-                // std::cout << std::endl;
             }
         }
 
