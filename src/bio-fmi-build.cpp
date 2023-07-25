@@ -23,23 +23,23 @@ namespace po = boost::program_options;
 Informations_signs inf;
 Config cfg;
 
-// long get_mem_usage()
-// {
-//     struct rusage myusage;
+long get_mem_usage()
+{
+    struct rusage myusage;
 
-//     getrusage(RUSAGE_SELF, &myusage);
-//     return myusage.ru_maxrss;
-// }
+    getrusage(RUSAGE_SELF, &myusage);
+    return myusage.ru_maxrss;
+}
 
-// double get_time_usage()
-// {
-//     struct rusage myusage;
+double get_time_usage()
+{
+    struct rusage myusage;
 
-//     getrusage(RUSAGE_SELF, &myusage);
-//     double system_time = (double)myusage.ru_stime.tv_sec + (double)myusage.ru_stime.tv_usec / 1000000.0;
-//     double user_time = (double)myusage.ru_utime.tv_sec + (double)myusage.ru_utime.tv_usec / 1000000.0;
-//     return system_time + user_time;
-// }
+    getrusage(RUSAGE_SELF, &myusage);
+    double system_time = (double)myusage.ru_stime.tv_sec + (double)myusage.ru_stime.tv_usec / 1000000.0;
+    double user_time = (double)myusage.ru_utime.tv_sec + (double)myusage.ru_utime.tv_usec / 1000000.0;
+    return system_time + user_time;
+}
 
 int handle_parameters(int argc, const char **argv)
 {
@@ -135,6 +135,45 @@ void run()
 
 }
 
+template <typename T>
+void run_parse_experiments(){
+    double time_baseline;
+    long mem_baseline;
+    std::vector<double> times;
+    std::vector<long> mems;
+
+    // std::filesystem::path input_path = "/home/draesdom/Documents/projects/bio-fmi/src/tests/test1/input.eds"; 
+
+    //  parse input
+    T *index = new T(cfg.context_length);
+    
+    std::cout << "==    RUNNING New Parse -> write to file <- method    ==";
+    mem_baseline = get_mem_usage();
+    time_baseline = get_time_usage();
+
+    index->parse(cfg.index_input_path,BLOCK_SIZE);
+
+    times.push_back((get_time_usage() - time_baseline));
+    mems.push_back((get_mem_usage() - time_baseline));
+
+    std::cout << "Build time: " << std::reduce(times.begin(), times.end()) / cfg.repetition <<  "s" << std::endl;
+    std::cout << "Peak RAM usage: " << std::reduce(mems.begin(), mems.end()) / cfg.repetition << " kB" << std::endl;
+
+    std::cout << "==    RUNNING Old read -> keep in mem <- method    ==";
+    mem_baseline = get_mem_usage();
+    time_baseline = get_time_usage();
+
+    index->read(cfg.index_input_path);
+
+    times.push_back((get_time_usage() - time_baseline));
+    mems.push_back((get_mem_usage() - time_baseline));
+
+    std::cout << "Build time: " << std::reduce(times.begin(), times.end()) / cfg.repetition <<  "s" << std::endl;
+    std::cout << "Peak RAM usage: " << std::reduce(mems.begin(), mems.end()) / cfg.repetition << " kB" << std::endl;
+
+
+
+}
 
 int main(int argc, char const *argv[])
 {
@@ -156,9 +195,11 @@ int main(int argc, char const *argv[])
     /*  Run Experiments */
     // we expect input file as eds format
     //TODO - no dependency on file extension .eds but validation during the parsing
-    else if (cfg.index_input_path.extension() == ".eds")
+    if (cfg.index_input_path.extension() == ".eds")
     {
-        run<eds>();
+        // run<eds>();
+        std::cout << cfg.index_input_path << std::endl;
+        run_parse_experiments<eds>();
     }
     else
     {

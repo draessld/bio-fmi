@@ -24,7 +24,7 @@ private:
     unsigned get_lcp(std::string ref,std::string change);   //  get longest common prefix - for input reading
     unsigned get_lcs(std::string ref,std::string change);   //  get longest common suffix - for input reading
     int get_change_possition(unsigned location,unsigned block_number,unsigned change_number,unsigned pre_hash_loc,unsigned pos_hash_loc);       //  get pointer to position to reference string from concatenation of changes (d)
-    int parse_block(std::string buffer);
+    int parse_block(std::string buffer, std::filesystem::path &input_path);
     int flush(const char* start,size_t size, std::ofstream &out_file);
 
     int first_context_length_;  //  length of first context - could be smaller than context length

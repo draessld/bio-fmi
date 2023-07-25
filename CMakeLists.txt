@@ -52,3 +52,19 @@ target_link_libraries(${BIO-FMI-BUILD} "-lboost_program_options")
 # target_link_libraries(${BIO-FMI-LOCATE} "-ldivsufsort")
 # target_link_libraries(${BIO-FMI-LOCATE} "-ldivsufsort64")
 # target_link_libraries(${BIO-FMI-LOCATE} "-lboost_program_options")
+
+#   tests
+set(TEST_FOLDER ${CMAKE_SOURCE_DIR}/tests)
+# create the testing file and list of tests
+set(PARSER_TESTS
+    ${TEST_FOLDER}/parser/1
+  )
+
+foreach (test ${PARSER_TESTS})
+get_filename_component (TestNumber ${test} NAME)
+  get_filename_component (Fpath ${test} DIRECTORY)
+  get_filename_component (TestType ${Fpath} NAME)
+  add_test (NAME ${TestType}_${TestNumber}_RUN COMMAND ${BIO-FMI-BUILD} ${test}/input.eds)
+  add_test (NAME ${TestType}_${TestNumber}_COMPARE_CHANGES COMMAND diff ${test}/o_changes.peds ${test}/changes.peds)
+  add_test (NAME ${TestType}_${TestNumber}_COMPARE_REFERENCE COMMAND diff ${test}/o_reference.peds ${test}/reference.peds)
+endforeach ()

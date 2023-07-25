@@ -100,24 +100,21 @@ namespace bio_fmi
             return base_position_[change_number] + offset_[change_number] - pos_hash_loc;
     }
 
-    int eds::parse_block(std::string buffer)
+    int eds::parse_block(std::string buffer, std::filesystem::path &input_path)
     {
-        print_v(std::vector<char>(buffer.data(), buffer.data() + buffer.size()));
+        // print_v(std::vector<char>(buffer.data(), buffer.data() + buffer.size()));
         //  first cross - get basic information
-        std::vector<unsigned> start_b;
+        std::vector<unsigned> base_position_;
         std::vector<unsigned> end_b;
         std::vector<unsigned> number_of_change;
-        std::vector<unsigned> lenght_of_change;
         std::vector<unsigned> change_position;
         std::vector<unsigned> contexts;
         unsigned len = 0;
-        unsigned minimal_right_context = buffer.size();
         unsigned context_length = 0;
 
-        std::filesystem::path reference = "/home/draesdom/Documents/projects/bio-fmi/src/tests/test1/reference.peds";
-
-        // std::ofstream reference_f(reference, std::ofstream::app);
+        std::filesystem::path reference = input_path.remove_filename().append("reference.peds");
         std::ofstream reference_f(reference, std::ofstream::out);
+        // std::ofstream reference_f(reference, std::ofstream::app);
 
         if (!reference_f)
         {
@@ -125,7 +122,7 @@ namespace bio_fmi
             return 1;
         }
 
-        std::filesystem::path changes = "/home/draesdom/Documents/projects/bio-fmi/src/tests/test1/changes.peds";
+        std::filesystem::path changes = input_path.remove_filename().append("changes.peds");
         std::ofstream changes_f(changes, std::ofstream::out);
         // std::ofstream changes_f(changes, std::ofstream::app);
 
@@ -147,7 +144,7 @@ namespace bio_fmi
                     contexts.push_back(0);
                 }
 
-                start_b.push_back(i);
+                base_position_.push_back(i);
                 if (number_of_change.empty())
                 {
                     number_of_change.push_back(0);
@@ -163,14 +160,14 @@ namespace bio_fmi
                 context_length = 0;
                 end_b.push_back(i);
                 number_of_change.back()++;
-                lenght_of_change.push_back(len);
+                change_lengths_.push_back(len);
                 len = 0;
                 number_of_segments_++;
                 break;
             case ',':
                 change_position.push_back(i);
                 number_of_change.back()++;
-                lenght_of_change.push_back(len);
+                change_lengths_.push_back(len);
                 len = 0;
                 break;
             default:
@@ -185,30 +182,30 @@ namespace bio_fmi
             contexts.push_back(0);
         }
 
-        std::cout << "context_length: " << context_length_ << std::endl;
-        std::cout << "number_of_segments: " << number_of_segments_ << std::endl;
-        print_v(start_b);
-        print_v(end_b);
-        print_v(number_of_change);
-        print_v(lenght_of_change);
-        print_v(change_position);
-        print_v(contexts);
+        // std::cout << "context_length: " << context_length_ << std::endl;
+        // std::cout << "number_of_segments: " << number_of_segments_ << std::endl;
+        // print_v(base_position_);
+        // print_v(end_b);
+        // print_v(number_of_change);
+        // print_v(change_lengths_);
+        // print_v(change_position);
+        // print_v(contexts);
 
         char divider = '#';
         size_t j = 0;
         bool first;
 
         //  pro kazdy blok
-        for (size_t i = 0; i < start_b.size(); i++)
+        for (size_t i = 0; i < base_position_.size(); i++)
         {
             //  flush reference
             if (i == 0)
             {
-                flush(buffer.c_str(), start_b[i], reference_f);
+                flush(buffer.c_str(), base_position_[i], reference_f);
             }
             else
             {
-                flush(buffer.c_str() + end_b[i - 1] + 1, start_b[i] - end_b[i - 1] - 1, reference_f);
+                flush(buffer.c_str() + end_b[i - 1] + 1, base_position_[i] - end_b[i - 1] - 1, reference_f);
             }
             
             //  flush changes
@@ -218,10 +215,9 @@ namespace bio_fmi
                 if (first)
                 { // first change = reference change
                     first ^= first;
-                    flush(buffer.c_str() + change_position[j] + 1, lenght_of_change[j], reference_f);
+                    flush(buffer.c_str() + change_position[j] + 1, change_lengths_[j], reference_f);
                 }else{
                     if(contexts[i+1] == 0 || i == number_of_segments_-1){
-                        std::cout << "tuto zmenu dokoncime standartne" << std::endl;
                         //  divider
                         flush(&divider,1,changes_f);
 
@@ -229,12 +225,12 @@ namespace bio_fmi
                         if(i==0)  //  are we in the beginning of EDS
                             flush(buffer.c_str(),contexts[i],changes_f);
                         else if(contexts[i] != 0)
-                            flush(buffer.c_str()+start_b[i]-contexts[i],contexts[i],changes_f);
+                            flush(buffer.c_str()+base_position_[i]-contexts[i],contexts[i],changes_f);
                         else
-                            flush(buffer.c_str()+start_b[i]-context_length_+1,context_length_-1,changes_f);
+                            flush(buffer.c_str()+base_position_[i]-context_length_+1,context_length_-1,changes_f);
 
                         //  change
-                        flush(buffer.c_str()+change_position[j]+1, lenght_of_change[j],changes_f);
+                        flush(buffer.c_str()+change_position[j]+1, change_lengths_[j],changes_f);
 
                         //  right_context  
                         if(i == number_of_segments_-1)    //  are we in the end of EDS
@@ -242,8 +238,6 @@ namespace bio_fmi
                         else                 
                             flush(buffer.c_str()+end_b[i]+1,context_length_-1,changes_f);
                     }else{
-                        std::cout << "tuto zmenu rozsirujeme pouze pro pravy context" << std::endl;
-                        
                         //  size of left and right blocks
                         for (size_t r = number_of_change[i]; r < number_of_change[i+1]; r++){
                             //  divider
@@ -251,12 +245,12 @@ namespace bio_fmi
 
                             //  left_context    
                             if(contexts[i] != 0)  //  are we in the beginning of EDS
-                                flush(buffer.c_str()+start_b[i]-contexts[i],contexts[i],changes_f);
+                                flush(buffer.c_str()+base_position_[i]-contexts[i],contexts[i],changes_f);
                             else
-                                flush(buffer.c_str()+start_b[i]-context_length_+1,context_length_-1,changes_f);
+                                flush(buffer.c_str()+base_position_[i]-context_length_+1,context_length_-1,changes_f);
 
                             //  change
-                            flush(buffer.c_str()+change_position[j]+1, lenght_of_change[j],changes_f);
+                            flush(buffer.c_str()+change_position[j]+1, change_lengths_[j],changes_f);
 
                             //  right_context
                              
@@ -693,7 +687,7 @@ namespace bio_fmi
             std::size_t bytesRead = input_file.gcount(); // Number of bytes read
             counter++;
             // Process the block
-            parse_block(std::string(buffer_.begin(), buffer_.begin() + bytesRead));
+            parse_block(std::string(buffer_.begin(), buffer_.begin() + bytesRead),input_path);
         }
         std::cout << "counter: " << counter << std::endl;
 
@@ -701,7 +695,7 @@ namespace bio_fmi
         std::size_t bytesRead = input_file.gcount(); // Number of bytes read after the last block
         if (bytesRead > 0)
         {
-            parse_block(std::string(buffer_.begin(), buffer_.begin() + bytesRead));
+            parse_block(std::string(buffer_.begin(), buffer_.begin() + bytesRead),input_path);
         }
 
         input_file.close();
