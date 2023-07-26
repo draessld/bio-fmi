@@ -147,7 +147,7 @@ void run_parse_experiments(){
     //  parse input
     T *index = new T(cfg.context_length);
     
-    std::cout << "==    RUNNING New Parse -> write to file <- method    ==";
+    std::cout << "==    RUNNING New Parse -> write to file <- method    ==" << std::endl;
     mem_baseline = get_mem_usage();
     time_baseline = get_time_usage();
 
@@ -156,10 +156,12 @@ void run_parse_experiments(){
     times.push_back((get_time_usage() - time_baseline));
     mems.push_back((get_mem_usage() - time_baseline));
 
-    std::cout << "Build time: " << std::reduce(times.begin(), times.end()) / cfg.repetition <<  "s" << std::endl;
+    std::cout << "Parse time: " << std::reduce(times.begin(), times.end()) / cfg.repetition <<  "s" << std::endl;
     std::cout << "Peak RAM usage: " << std::reduce(mems.begin(), mems.end()) / cfg.repetition << " kB" << std::endl;
 
-    std::cout << "==    RUNNING Old read -> keep in mem <- method    ==";
+    std::cout << std::endl;
+
+    std::cout << "==    RUNNING Old read -> keep in mem <- method    =="<< std::endl;
     mem_baseline = get_mem_usage();
     time_baseline = get_time_usage();
 
@@ -168,7 +170,7 @@ void run_parse_experiments(){
     times.push_back((get_time_usage() - time_baseline));
     mems.push_back((get_mem_usage() - time_baseline));
 
-    std::cout << "Build time: " << std::reduce(times.begin(), times.end()) / cfg.repetition <<  "s" << std::endl;
+    std::cout << "Parse time: " << std::reduce(times.begin(), times.end()) / cfg.repetition <<  "s" << std::endl;
     std::cout << "Peak RAM usage: " << std::reduce(mems.begin(), mems.end()) / cfg.repetition << " kB" << std::endl;
 
 

@@ -48,11 +48,16 @@ namespace bio_fmi
         std::string new_original_;      //  buffer for transformed EDS string
 
         unsigned context_length_;   //  input context length
+        unsigned context_length_less_one_;   //  input context length
         unsigned current_context_length_;   //  current context length - help improve time when the last chunk is smaller - universal distribution of two last chunk to similar size
 
-        std::vector<unsigned> start_possitions_;    //  positions in concatenation of changes, where new sequence starts
-        std::vector<unsigned> base_position_;   //  base postiion of change in reference string
+        std::vector<unsigned> start_possitions_;    //  during parsing: save position of opening branch {
+        std::vector<unsigned> end_possitions_;    //  during parsing: save position of closing branch }
+        std::vector<unsigned> base_position_;   //  base postion of change in reference string
+        std::vector<unsigned> change_position_;  //  length of each change
         std::vector<unsigned> change_lengths_;  //  length of each change
+        std::vector<unsigned> number_of_change_;  // cumulative
+        std::vector<unsigned> contexts_;  //  length of each change
         std::vector<int> offset_;   //  offset of positions in reference and non-reference sequence - for every change stored
 
         Bio_FMi(unsigned context_length);

@@ -1,6 +1,6 @@
 #include "eds.h"
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
+#define NONZERO(a) (> 0 ? (a) : 0)
 
 namespace bio_fmi
 {
@@ -22,7 +22,7 @@ namespace bio_fmi
     }
 
     int eds::flush(const char *start, size_t size, std::ofstream &out_file)
-    {        
+    {
         out_file.write(start, size);
         return 0;
     }
@@ -100,17 +100,140 @@ namespace bio_fmi
             return base_position_[change_number] + offset_[change_number] - pos_hash_loc;
     }
 
+    int eds::flush_change(unsigned number_of_chars_required, std::ofstream &changes_f, std::vector<unsigned> &tmp){
+        static unsigned depth = 1;
+        static unsigned change_number = j_;
+
+
+        if (contexts_[i_+depth] >= number_of_chars_required){
+            //  only required number of chars => done
+
+            //  divider
+            flush(&divider_, 1, changes_f);
+
+            //  left_context
+            flush(buffer_.c_str() + start_possitions_[i_] - contexts_[i_], contexts_[i_], changes_f);
+
+            //  change
+            flush(buffer_.c_str() + change_position_[j_], change_lengths_[j_], changes_f);
+
+            //  right context
+            for (size_t k = tmp.size(); k > 0; k--)
+            {   
+                //  complete previous context
+                flush(buffer_.c_str() + end_possitions_[i_+depth-k], contexts_[i_+depth-k], changes_f);
+                
+                //  complete previous change
+                flush(buffer_.c_str() + change_position_[tmp[k]], change_lengths_[tmp[k]], changes_f);
+            }
+            
+            //  write rest of context
+            flush(buffer_.c_str() + end_possitions_[i_], contexts_[i_+depth], changes_f);
+
+            return 0;
+        }else{
+            //  whole common context    +   
+            number_of_chars_required -= contexts_[i_+depth];
+        
+            for (change_number; change_number < number_of_change_[i_+depth]; change_number++)
+            {
+                if(change_lengths_[change_number] > number_of_chars_required){
+                    //  need to write only few characters from change
+                    //  divider
+                    flush(&divider_, 1, changes_f);
+
+                    //  left_context
+                    flush(buffer_.c_str() + start_possitions_[i_] - contexts_[i_], contexts_[i_], changes_f);
+
+                    //  change
+                    flush(buffer_.c_str() + change_position_[j_], change_lengths_[j_], changes_f);
+
+                    //  right context
+                    for (size_t k = tmp.size(); k > 0; k--)
+                    {   
+                        //  complete previous contexts
+                        flush(buffer_.c_str() + end_possitions_[i_+depth-k], contexts_[i_+depth-k], changes_f);
+                
+                        //  complete previous changes
+                        flush(buffer_.c_str() + change_position_[tmp[k]], change_lengths_[tmp[k]], changes_f);
+                    }
+            
+                    //  write full context
+                    flush(buffer_.c_str() + end_possitions_[i_+depth], contexts_[i_+depth], changes_f);
+                    //  write part of change
+                    flush(buffer_.c_str() + change_position_[change_number], change_lengths_[change_number], changes_f);
+
+                    return 0;
+
+                
+                }else{
+                    //  whole change needs to be in right context
+                    tmp.push_back(change_number);
+                    number_of_chars_required -= change_lengths_[change_number];
+                    flush_change(number_of_chars_required, changes_f, tmp);
+
+            
+                }
+
+
+            }
+        }
+    }
+
+    int eds::flush_segments(std::ofstream &reference_f, std::ofstream &changes_f)
+    {
+        bool first;
+        for (i_; i_ < number_of_segments_; i_++)
+        {
+            //  flush reference
+            if (i_ == 0)
+            {
+                flush(buffer_.c_str(), start_possitions_[i_], reference_f);
+            }
+            else
+            {
+                flush(buffer_.c_str() + end_possitions_[i_ - 1], start_possitions_[i_] - end_possitions_[i_ - 1], reference_f);
+            }
+
+            //  flush changes
+            first = true;
+            for (j_; j_ < number_of_changes_; j_++)
+            {
+                if (first)
+                { // first change = reference change
+                    first ^= first;
+                    flush(buffer_.c_str() + change_position_[j_], change_lengths_[j_], reference_f);
+                }
+                else
+                {
+
+                    //  flush change
+                    std::vector<unsigned> tmp;
+                    flush_change(context_length_less_one_, changes_f,tmp);
+
+                    //  divider
+                    // flush(&divider_, 1, changes_f);
+
+                    // //  left_context
+                    // flush(buffer_.c_str() + start_possitions_[i_] - contexts_[i_], contexts_[i_], changes_f);
+
+                    // //  change
+                    // flush(buffer_.c_str() + change_position_[j_], change_lengths_[j_], changes_f);
+
+                    // //  right_context
+                    // flush(buffer_.c_str() + end_possitions_[i_], contexts_[i_ + 1], changes_f);
+                    
+                }
+            }
+        }
+    }
+
     int eds::parse_block(std::string buffer, std::filesystem::path &input_path)
     {
-        // print_v(std::vector<char>(buffer.data(), buffer.data() + buffer.size()));
-        //  first cross - get basic information
-        std::vector<unsigned> base_position_;
-        std::vector<unsigned> end_b;
-        std::vector<unsigned> number_of_change;
-        std::vector<unsigned> change_position;
-        std::vector<unsigned> contexts;
-        unsigned len = 0;
-        unsigned context_length = 0;
+        i_=j_=0;
+        unsigned tmp1 = 0;
+        bool closed = false;
+        context_length_less_one_ = context_length_-1;
 
         std::filesystem::path reference = input_path.remove_filename().append("reference.peds");
         std::ofstream reference_f(reference, std::ofstream::out);
@@ -132,144 +255,48 @@ namespace bio_fmi
             return 1;
         }
 
-        // find starts of degenerate symbols
         for (size_t i = 0; i != buffer.size(); i++)
         {
             switch (buffer[i])
             {
             case '{':
-                if ((context_length_-1)>context_length){
-                    contexts.push_back(context_length);
-                }else{
-                    contexts.push_back(0);
-                }
-
-                base_position_.push_back(i);
-                if (number_of_change.empty())
-                {
-                    number_of_change.push_back(0);
-                }
-                else
-                {
-                    number_of_change.push_back(number_of_change.back());
-                }
-                change_position.push_back(i);
-                len = 0;
+                if(number_of_segments_==0)
+                    contexts_.push_back((context_length_ > tmp1) ? (tmp1) : context_length_less_one_);
+                number_of_segments_++;
+                start_possitions_.push_back(i);
+                change_position_.push_back(i+1);
+                tmp1 = 0;
+                closed = false;
                 break;
             case '}':
-                context_length = 0;
-                end_b.push_back(i);
-                number_of_change.back()++;
-                change_lengths_.push_back(len);
-                len = 0;
-                number_of_segments_++;
+                number_of_changes_++;
+                number_of_change_.push_back(number_of_changes_);
+                end_possitions_.push_back(i+1);
+                change_lengths_.push_back(tmp1);
+                tmp1 = 0;
+                closed = true;
                 break;
             case ',':
-                change_position.push_back(i);
-                number_of_change.back()++;
-                change_lengths_.push_back(len);
-                len = 0;
+                number_of_changes_++;
+                change_lengths_.push_back(tmp1);
+                change_position_.push_back(i+1);
+                tmp1 = 0;
                 break;
             default:
-                context_length++;
-                len++;
-                break;
-            }
-        }
-        if ((context_length_-1)>context_length){
-            contexts.push_back(context_length);
-        }else{
-            contexts.push_back(0);
-        }
-
-        // std::cout << "context_length: " << context_length_ << std::endl;
-        // std::cout << "number_of_segments: " << number_of_segments_ << std::endl;
-        // print_v(base_position_);
-        // print_v(end_b);
-        // print_v(number_of_change);
-        // print_v(change_lengths_);
-        // print_v(change_position);
-        // print_v(contexts);
-
-        char divider = '#';
-        size_t j = 0;
-        bool first;
-
-        //  pro kazdy blok
-        for (size_t i = 0; i < base_position_.size(); i++)
-        {
-            //  flush reference
-            if (i == 0)
-            {
-                flush(buffer.c_str(), base_position_[i], reference_f);
-            }
-            else
-            {
-                flush(buffer.c_str() + end_b[i - 1] + 1, base_position_[i] - end_b[i - 1] - 1, reference_f);
-            }
-            
-            //  flush changes
-            first = true;
-            for (j; j < number_of_change[i]; j++)
-            {
-                if (first)
-                { // first change = reference change
-                    first ^= first;
-                    flush(buffer.c_str() + change_position[j] + 1, change_lengths_[j], reference_f);
-                }else{
-                    if(contexts[i+1] == 0 || i == number_of_segments_-1){
-                        //  divider
-                        flush(&divider,1,changes_f);
-
-                        //  left_context                    
-                        if(i==0)  //  are we in the beginning of EDS
-                            flush(buffer.c_str(),contexts[i],changes_f);
-                        else if(contexts[i] != 0)
-                            flush(buffer.c_str()+base_position_[i]-contexts[i],contexts[i],changes_f);
-                        else
-                            flush(buffer.c_str()+base_position_[i]-context_length_+1,context_length_-1,changes_f);
-
-                        //  change
-                        flush(buffer.c_str()+change_position[j]+1, change_lengths_[j],changes_f);
-
-                        //  right_context  
-                        if(i == number_of_segments_-1)    //  are we in the end of EDS
-                            flush(buffer.c_str()+end_b[i]+1,contexts[i+1],changes_f);
-                        else                 
-                            flush(buffer.c_str()+end_b[i]+1,context_length_-1,changes_f);
-                    }else{
-                        //  size of left and right blocks
-                        for (size_t r = number_of_change[i]; r < number_of_change[i+1]; r++){
-                            //  divider
-                            flush(&divider,1,changes_f);
-
-                            //  left_context    
-                            if(contexts[i] != 0)  //  are we in the beginning of EDS
-                                flush(buffer.c_str()+base_position_[i]-contexts[i],contexts[i],changes_f);
-                            else
-                                flush(buffer.c_str()+base_position_[i]-context_length_+1,context_length_-1,changes_f);
-
-                            //  change
-                            flush(buffer.c_str()+change_position[j]+1, change_lengths_[j],changes_f);
-
-                            //  right_context
-                             
-                            if(i == number_of_segments_)    //  are we in the end of EDS
-                                flush(buffer.c_str()+end_b[i]+1,buffer.size() - end_b[i],changes_f);
-                            else{
-                                flush(buffer.c_str()+end_b[i]+1,contexts[i+1],changes_f);   //  the maximal possible common context
-                                //
-                                flush(buffer.c_str()+change_position[r]+1, context_length_-contexts[i+1]-1,changes_f); //  tha part of change from next block
-                            }
-                        }
-                    }
+                tmp1++;
+                //  check if change is flushable
+                if (((closed) && (tmp1 >= context_length_less_one_ )) ||(i == (buffer.size()-1))) 
+                {
+                    //  flush info
+                    contexts_.push_back(tmp1);
+                    flush_segments(reference_f, changes_f);
                 }
+                break;
             }
         }
 
         reference_f.close();
         changes_f.close();
-
 
         return 0;
     }
@@ -687,7 +714,7 @@ namespace bio_fmi
             std::size_t bytesRead = input_file.gcount(); // Number of bytes read
             counter++;
             // Process the block
-            parse_block(std::string(buffer_.begin(), buffer_.begin() + bytesRead),input_path);
+            parse_block(std::string(buffer_.begin(), buffer_.begin() + bytesRead), input_path);
         }
         std::cout << "counter: " << counter << std::endl;
 
@@ -695,7 +722,7 @@ namespace bio_fmi
         std::size_t bytesRead = input_file.gcount(); // Number of bytes read after the last block
         if (bytesRead > 0)
         {
-            parse_block(std::string(buffer_.begin(), buffer_.begin() + bytesRead),input_path);
+            parse_block(std::string(buffer_.begin(), buffer_.begin() + bytesRead), input_path);
         }
 
         input_file.close();
