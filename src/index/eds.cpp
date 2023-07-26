@@ -100,10 +100,7 @@ namespace bio_fmi
             return base_position_[change_number] + offset_[change_number] - pos_hash_loc;
     }
 
-    int eds::flush_change(unsigned number_of_chars_required, std::ofstream &changes_f, std::vector<unsigned> &tmp){
-        static unsigned depth = 1;
-        static unsigned change_number = j_;
-
+    int eds::flush_change(unsigned number_of_chars_required, std::ofstream &changes_f, std::vector<unsigned> &tmp, unsigned depth){
 
         if (contexts_[i_+depth] >= number_of_chars_required){
             //  only required number of chars => done
@@ -121,23 +118,22 @@ namespace bio_fmi
             for (size_t k = tmp.size(); k > 0; k--)
             {   
                 //  complete previous context
-                flush(buffer_.c_str() + end_possitions_[i_+depth-k], contexts_[i_+depth-k], changes_f);
+                flush(buffer_.c_str() + end_possitions_[i_+depth-k-1], contexts_[i_+depth-k], changes_f);
                 
                 //  complete previous change
-                flush(buffer_.c_str() + change_position_[tmp[k]], change_lengths_[tmp[k]], changes_f);
+                flush(buffer_.c_str() + change_position_[tmp[k-1]], change_lengths_[tmp[k-1]], changes_f);
             }
             
             //  write rest of context
-            flush(buffer_.c_str() + end_possitions_[i_], contexts_[i_+depth], changes_f);
-
+            flush(buffer_.c_str() + end_possitions_[i_+depth-1], number_of_chars_required, changes_f);
             return 0;
         }else{
             //  whole common context    +   
             number_of_chars_required -= contexts_[i_+depth];
         
-            for (change_number; change_number < number_of_change_[i_+depth]; change_number++)
+            for (size_t change_number = number_of_change_[i_+depth-1]; change_number < number_of_change_[i_+depth]; change_number++)
             {
-                if(change_lengths_[change_number] > number_of_chars_required){
+                if(change_lengths_[change_number] >= number_of_chars_required){
                     //  need to write only few characters from change
                     //  divider
                     flush(&divider_, 1, changes_f);
@@ -151,32 +147,27 @@ namespace bio_fmi
                     //  right context
                     for (size_t k = tmp.size(); k > 0; k--)
                     {   
-                        //  complete previous contexts
-                        flush(buffer_.c_str() + end_possitions_[i_+depth-k], contexts_[i_+depth-k], changes_f);
-                
-                        //  complete previous changes
-                        flush(buffer_.c_str() + change_position_[tmp[k]], change_lengths_[tmp[k]], changes_f);
+                        //  complete previous context
+                        flush(buffer_.c_str() + end_possitions_[i_+depth-k-1], contexts_[i_+depth-k], changes_f);
+
+                        //  complete previous change
+                        flush(buffer_.c_str() + change_position_[tmp[k-1]], change_lengths_[tmp[k-1]], changes_f);
                     }
             
                     //  write full context
-                    flush(buffer_.c_str() + end_possitions_[i_+depth], contexts_[i_+depth], changes_f);
+                    flush(buffer_.c_str() + end_possitions_[i_+depth-1], contexts_[i_+depth], changes_f);
                     //  write part of change
-                    flush(buffer_.c_str() + change_position_[change_number], change_lengths_[change_number], changes_f);
-
-                    return 0;
-
+                    flush(buffer_.c_str() + change_position_[change_number], number_of_chars_required, changes_f);
                 
                 }else{
                     //  whole change needs to be in right context
                     tmp.push_back(change_number);
-                    number_of_chars_required -= change_lengths_[change_number];
-                    flush_change(number_of_chars_required, changes_f, tmp);
-
-            
+                    flush_change(number_of_chars_required-change_lengths_[change_number], changes_f, tmp,depth+1);
+                    tmp.pop_back();
                 }
 
-
             }
+            return 0;
         }
     }
 
@@ -206,23 +197,9 @@ namespace bio_fmi
                 }
                 else
                 {
-
                     //  flush change
                     std::vector<unsigned> tmp;
-                    flush_change(context_length_less_one_, changes_f,tmp);
-
-                    //  divider
-                    // flush(&divider_, 1, changes_f);
-
-                    // //  left_context
-                    // flush(buffer_.c_str() + start_possitions_[i_] - contexts_[i_], contexts_[i_], changes_f);
-
-                    // //  change
-                    // flush(buffer_.c_str() + change_position_[j_], change_lengths_[j_], changes_f);
-
-                    // //  right_context
-                    // flush(buffer_.c_str() + end_possitions_[i_], contexts_[i_ + 1], changes_f);
-                    
+                    flush_change(context_length_less_one_, changes_f,tmp,1);                    
                 }
             }
         }
@@ -260,8 +237,7 @@ namespace bio_fmi
             switch (buffer[i])
             {
             case '{':
-                if(number_of_segments_==0)
-                    contexts_.push_back((context_length_ > tmp1) ? (tmp1) : context_length_less_one_);
+                contexts_.push_back((context_length_ > tmp1) ? (tmp1) : context_length_less_one_);
                 number_of_segments_++;
                 start_possitions_.push_back(i);
                 change_position_.push_back(i+1);

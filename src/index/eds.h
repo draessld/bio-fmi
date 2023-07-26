@@ -27,7 +27,7 @@ private:
     int get_change_possition(unsigned location,unsigned block_number,unsigned change_number,unsigned pre_hash_loc,unsigned pos_hash_loc);       //  get pointer to position to reference string from concatenation of changes (d)
     int parse_block(std::string buffer, std::filesystem::path &input_path);
     int flush(const char* start,size_t size, std::ofstream &out_file);
-    int flush_change(unsigned number_of_chars_required, std::ofstream &changes_f, std::vector<unsigned> &tmp);
+    int flush_change(unsigned number_of_chars_required, std::ofstream &changes_f, std::vector<unsigned> &tmp, unsigned depth);
     int flush_segments(std::ofstream &reference_f, std::ofstream &changes_f);
 
 
