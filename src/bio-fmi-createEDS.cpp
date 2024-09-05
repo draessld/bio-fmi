@@ -16,6 +16,7 @@ struct Config
     std::filesystem::path file;
     std::filesystem::path eds_file;
     int method;  //  type of used method, 1=leds, 2=cart-leds
+    bool discard = false;
 };
 
 Informations_signs inf;
@@ -28,11 +29,14 @@ int handle_parameters(int argc, const char **argv)
     desc.add_options()("help", "produce help message")
     ("help-verbose", "display verbose help message")
     ("version,v", "display version info")
-    ("cart-l-eds,c", "run benchmark test for given file - create EDS with l-eds and with cart-l-eds method and compare printout results")
-    ("l-eds,e", "run benchmark test for given file - create EDS with l-eds and with cart-l-eds method and compare printout results")
+    ("msa2cartleds,c", "run benchmark test for given file - create EDS with l-eds and with cart-l-eds method and compare printout results")
+    ("msa2leds,e", "run benchmark test for given file - create EDS with l-eds and with cart-l-eds method and compare printout results")
+    ("eds2leds,g", "run benchmark test for given file - create EDS with l-eds and with cart-l-eds method and compare printout results")
     ("stats,s", "calculate statistics about given eds")
-    ("context_length,l", po::value<int>(&cfg.l)->required(), "length of chunk and stored context, default 5")
-    ("file", po::value<std::filesystem::path>(&cfg.file), "");
+    ("discard,d", "explicitly say to not save the EDS into file")
+    ("context_length,l", po::value<int>(&cfg.l), "length of chunk and stored context, default 5")
+    ("file", po::value<std::filesystem::path>(&cfg.file)->required(), "")
+    ("output,o", po::value<std::filesystem::path>(&cfg.eds_file), "");
 
     po::positional_options_description posOptions;
 
@@ -70,17 +74,21 @@ int handle_parameters(int argc, const char **argv)
             std::cout << inf.versionInfo << std::endl;
             return 1;
         }
-        if (vm.count("cart-l-eds") == 0 && vm.count("l-eds") == 0){
-            std::cout << "Usage: " << argv[0] << " " << inf.createEDSInfoString << std::endl;
-        }
-        if(vm.count("cart-l-eds")){
+        // if (vm.count("msa2cartleds") == 0 && vm.count("msa2leds") == 0){
+        //     std::cout << "Usage: " << argv[0] << " " << inf.createEDSInfoString << std::endl;
+        // }
+        if(vm.count("msa2cartleds")){
             cfg.method = 2;   
         }
-
-        if(vm.count("l-eds")){
+        if(vm.count("discard")){
+            cfg.discard = true;   
+        }
+        if(vm.count("msa2leds")){
             cfg.method = 1;   
         }
-
+        if(vm.count("eds2leds")){
+            cfg.method = 3;   
+        }
         if(vm.count("stats")){
             cfg.method = 0;   
         }
@@ -107,21 +115,34 @@ int run(){
     case 0:
         /* EDS under l-context condition method */
         std::cout << "Counting statistic on given EDS file" << std::endl;
-        validate_eds(cfg.file, cfg.l);
+        count_eds(cfg.file);
         break;
     case 1:
         /* EDS under l-context condition method */
         std::cout << "EDS under l-context condition method" << std::endl;
-        get_l_eds(cfg.file, cfg.eds_file, cfg.l);
-        std::cout << "EDS saved on " << cfg.eds_file << std::endl;
+        msa2leds(cfg.file, cfg.eds_file, cfg.l,!cfg.discard);
+        if (!cfg.discard){
+            std::cout << "EDS saved on " << cfg.eds_file << std::endl;
+        }
         break;
     case 2:
         /* cartesian product under l-context condition method */
         std::cout << "EDS with cartesian product under l-context condition method" << std::endl;
-        get_cartl_eds(cfg.file, cfg.eds_file, cfg.l);
-        std::cout << "EDS saved on " << cfg.eds_file << std::endl;
+        msa2cartleds(cfg.file, cfg.eds_file, cfg.l,!cfg.discard);
+        if (!cfg.discard){
+            std::cout << "EDS saved on " << cfg.eds_file << std::endl;
+        }
         break;
-    
+    case 3:
+        /* cartesian product under l-context condition method */
+        std::cout << "EDS with cartesian product under l-context condition method" << std::endl;
+        if (cfg.discard){
+            eds2leds(cfg.file,cfg.l);
+        }else{
+            eds2leds(cfg.file, cfg.eds_file, cfg.l);
+            std::cout << "EDS saved on " << cfg.eds_file << std::endl;
+        }
+        break;
     default:
         std::cout << "Unknown method, exiting ...";
         return -1;

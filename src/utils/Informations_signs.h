@@ -8,7 +8,7 @@
 struct Informations_signs
 {
     const std::string versionInfo = "bio-fmi v1.1";
-    const std::string createEDSInfoString = "bio-fmi-createEDS [-c|-e] <msa_file>";
+    const std::string createEDSInfoString = "bio-fmi-createEDS [-c|-e|-g|-s] <file>";
     const std::string buildUsageInfoString = "bio-fmi-build [-m|-e]<input_text_file>";
     const std::string locateUsageInfoString = "bio-fmi-locate <index_basename> -P<pattern_file> -p<pattern>";
     

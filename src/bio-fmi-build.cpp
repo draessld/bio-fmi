@@ -194,13 +194,13 @@ int main(int argc, char const *argv[])
     
     }else{
         // check validity of context length and the shortest common part in EDS
-        std::cout << "  Validating EDS ...";
-        if(validate_eds(cfg.eds_file,cfg.l)!=0){
+        // std::cout << "  Validating EDS ...";
+        // if(counteds(cfg.eds_file,cfg.l)!=0){
 
-            std::cout << "Unable to work with context length shorter than is some common part in EDS\n" << std::endl;
-            return EXIT_FAILURE;
-        }
-        std::cout << "  done!" << std::endl;
+        //     std::cout << "Unable to work with context length shorter than is some common part in EDS\n" << std::endl;
+        //     return EXIT_FAILURE;
+        // }
+        // std::cout << "  done!" << std::endl;
 
         //  run index
         run_explicit();
