@@ -9,8 +9,8 @@ BASE_DIR=$(pwd)
 echo "Starting project configuration..."
 
 # 1. Install Python dependencies
-echo "Installing Python dependencies..."
-pip install -r requirements.txt
+# echo "Installing Python dependencies..."
+# pip install -r requirements.txt
 
 # 2. Compile C++ code
 echo "Compiling C++ code..."
@@ -30,25 +30,25 @@ cd $BASE_DIR
 # python -m unittest discover -s tests -p '*_test.py'
 
 # 5. Create alias for run.py
-echo "Creating alias 'katka2' for run.py..."
-alias katka2="python $BASE_DIR/run.py"
+echo "Creating alias 'biofmi' for run.py..."
+alias biofmi="python $BASE_DIR/run.py"
 
 # 6. Generate configure.json file
-echo "Generating configure.json..."
-cat <<EOL > configure.json
-{
-    "output_dir": "$BASE_DIR/output",
-    "build_dir": "$BASE_DIR/scripts/build",
-    "cpp_exe":{
-        "build_exe": "$BASE_DIR/scripts/build/build",
-        "find_exe": "$BASE_DIR/scripts/build/find",
-        "kernelize_exe": "$BASE_DIR/scripts/build/kernelize",
-        "minimize_exe": "$BASE_DIR/scripts/build/minimize"
-    }
-}
-EOL
+# echo "Generating configure.json..."
+# cat <<EOL > configure.json
+# {
+#     "output_dir": "$BASE_DIR/output",
+#     "build_dir": "$BASE_DIR/scripts/build",
+#     "cpp_exe":{
+#         "build_exe": "$BASE_DIR/scripts/build/build",
+#         "find_exe": "$BASE_DIR/scripts/build/find",
+#         "kernelize_exe": "$BASE_DIR/scripts/build/kernelize",
+#         "minimize_exe": "$BASE_DIR/scripts/build/minimize"
+#     }
+# }
+# EOL
 
-ALIAS_NAME="katka2"
+ALIAS_NAME="biofmi"
 ALIAS_COMMAND="python3 $BASE_DIR/run.py"
 
 # File to modify
