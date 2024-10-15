@@ -60,7 +60,13 @@ EDS::EDS(std::istream &is){
             break;
         }
     }
-    avg_l = l_common / n_common;
+    if (n_common==0)
+    {
+        avg_l = 0;
+    }else{
+        avg_l = l_common / n_common;
+    }
+    
 }
 
 EDS::~EDS() {

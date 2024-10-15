@@ -113,12 +113,12 @@ int main(int argc, char const *argv[])
     {
     case 1:
         /* MSA */
-        cout << "msa" << endl;
         if (method == "linear")
         {
             msa2leds_linear(ifs,ofs,l);
         }
         if(method == "cartesian"){
+            cout << "cart" << endl;
             msa2leds_cartesian(ifs,ofs,l);
         }
         
