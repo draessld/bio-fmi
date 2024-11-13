@@ -10,7 +10,6 @@ import sys
 import glob
 
 #   GLOBALS
-# allowed_fasta_extenstions = ['.fa','.fasta','.fna']
 def transform(*args, **kwargs):
     file = args[0]
     ls = args[1]
@@ -21,7 +20,7 @@ def transform(*args, **kwargs):
         print(f"Transforming {file} into regular EDS")
         print(file)
     else:
-        # print(f"Transforming {file} into l-EDS with l:{ls} using {method} method")
+        print(f"Transforming {file} into l-EDS with l:{ls} using {method} method")
         for l in tqdm(ls):
             out_file = file[:-3] + str(l)
             out_file += '.l.leds' if method == 'linear' else '.c.leds'
@@ -68,27 +67,6 @@ def parse_range(value):
     except Exception as e:
         raise argparse.ArgumentTypeError(f"Invalid input: {value}. Must be a single number or a range in the format 'start-end'.")
 
-def parse_inputs(inputs, type='f'):
-    files = []
-    sequences = []
-
-    for input_path in inputs:
-        input_path = Path(input_path)
-
-        # Check if the input is a directory
-        if input_path.is_dir():
-            if type == 'f':
-                # Collect all files under the directory
-                files += [str(file) for file in input_path.rglob('*') if file.is_file()]
-            elif type == 'd':
-                # Collect all directories under the directory
-                files += [str(dir) for dir in input_path.rglob('*') if dir.is_dir()]
-        else:
-            # If it's not a directory, consider it a sequence
-            sequences.append(str(input_path))
-
-    return sequences, files
-
 def main():
     #   parse arguments
     parser = argparse.ArgumentParser(description="Create and index Elastic-Degenerat String")
@@ -103,12 +81,13 @@ def main():
     parser_transform = subparsers.add_parser("transform", help="Create EDS or lEDS from MSA or VCF")
     parser_transform.add_argument("-l", required=False, type=parse_range, help="context length, can be given range in format a-b-c as from a to b by c steps")
     parser_transform.add_argument("inputs", nargs='+', type=str, help="input in format of set of sequences, set of files or folder that contains given original files")
-    parser_transform.add_argument("-o","--output", type=argparse.FileType('w'), default=sys.stdout, help="output file")
+    parser_transform.add_argument("-o","--output_bs", type=str, help="output basename")
     parser_transform.add_argument("--method", required=None ,type=str, help="")
 
     # Build command
     parser_build = subparsers.add_parser("build", help="Build index")
-    parser_build.add_argument("inputs", nargs='+', type=str, help="input in format of set of sequences, set of files or folder that contains given original files")
+    parser_build.add_argument("input", type=str, help="input in format of set of sequences, set of files or folder that contains given original files")
+    parser_build.add_argument("-o","--output_bs", type=str, default=None, help="output basename")
     parser_build.add_argument("--rebuild", required=False, default=False, action='store_true', help="if minimized file already exists, it will be replaced by the new one")
 
     # Locate command
@@ -155,14 +134,16 @@ def main():
         if method not in allowed_methods:
             raise Exception(f"Unknown method: {args.method}, must be one of {allowed_methods}")
 
-        # executable_path = "./scripts/build/src/transform"
-        _,files = parse_inputs(args.inputs,type='f')
+        files = []
+        for input in args.inputs:
+            files += glob.glob(input)
+
         for file in files: 
             ext = file.split('.')[-1] 
             if ext not in allowed_extensions:
                 raise Exception(f"Unknown file extension: {ext}, supports {allowed_extensions}")
 
-            transform(file,args.l,args.method)           
+            transform(file,args.l,method)           
     else:
         raise Exception(f"Unknown command: {args.command}, check your arguments")
 if __name__ == "__main__":

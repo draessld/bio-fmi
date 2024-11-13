@@ -1,33 +1,30 @@
 # test/CMakeLists.txt
 
-# Include the main source directory for header files
-include_directories(${CMAKE_SOURCE_DIR}/src)
-# file(GLOB eds_C "utils/*.cpp")
-# file(GLOB eds_H "utils/*.h")
-# file(GLOB eds ${eds_C} ${eds_H})
+# Enable testing
+enable_testing()
 
-include_directories(~/include) #SDSL headers are here
-LINK_DIRECTORIES(~/lib) #SDSL lib are here
+# Specify the location of the utils headers and external libraries
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src/utils)  # Include utils headers
+include_directories(BEFORE ~/include)  # External headers
+link_directories(BEFORE ~/lib)  # External libraries
 
-# find_package(Boost REQUIRED)
-# find_library(SDSL_LIB sdsl HINTS /home/draesdom/include/sdsl)
-# Optionally, you can set the linker flags if needed
+# List of external libraries needed for tests
+set(EXTERNAL_LIBS sdsl boost_program_options divsufsort64 divsufsort)
 
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -Wall -Wno-long-long -pedantic -std=c++17 -O3 -L/home/draesdom/lib -L/home/draesdom/Libs/boost_1_81_0/libs")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -Wall -Wno-long-long -pedantic -std=c++17 -g -L/home/draesdom/lib -L/home/draesdom/Libs/boost_1_81_0/libs")
+# Collect all test .cpp files in the test folder
+file(GLOB TEST_FILES CONFIGURE_DEPENDS "*.cpp")
 
-# Gather all test files from the test directory
-file(GLOB TEST_SOURCES "*.cpp")
+# Link the utils library and external libraries to each test
+foreach(TEST_FILE ${TEST_FILES})
+    # Get the test name from the filename without directory path and extension
+    get_filename_component(TEST_NAME ${TEST_FILE} NAME_WE)
 
-# Create an executable for each test file and register it with CTest
-foreach(TEST_SRC ${TEST_SOURCES})
-    # Get the filename without the directory to use as the test name
-    get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
+    # Add an executable for each test file
+    add_executable(${TEST_NAME} ${TEST_FILE})
 
-    # Create a test executable for each test source file
-    add_executable(${TEST_NAME} ${TEST_SRC})    
-    target_link_libraries(${TEST_NAME} "-lsdsl")    # Link with Boost libraries
+    # Link each test executable to the utils library and external libraries
+    target_link_libraries(${TEST_NAME} PRIVATE utils ${EXTERNAL_LIBS})
 
-    # Add the test executable to CTest
+    # Add each test to CTest
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endforeach()

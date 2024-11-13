@@ -10,6 +10,7 @@
 #include <bits/stdc++.h>
 
 #include <sdsl/suffix_arrays.hpp>
+#include "eds.hpp"
 
 using namespace sdsl;
 
@@ -53,27 +54,30 @@ namespace bio_fmi
         int save();      //  save index files into folder
         int load();      //  load index files from folder
         void print_hash(const hash_type &hash_map);
+    public:
         void print(); //  print information about index structures
 
-    public:
         //  statistics
         int context_length_;        //  input context length
         double total_index_size_;
 
         size_t n;                 //  length of EDS = number of nonempty sets
         size_t N;                 //  total length including the
-        size_t total_deg_strings; //  number of strings in the degenerate symbols
+        size_t m;                 //  number of strings in all sets
 
         //  methods
         Bio_FMi(std::filesystem::path eds_file, int context_length); //  to create new index
         Bio_FMi(std::filesystem::path index_folder);                      //  to load index from the folder
         ~Bio_FMi();
 
+        // Bio_FMi(EDS eds, int context_length); //  to create new index
+        
+
         int build();               //  construct index - WT FM index structures
         int locate(std::string P); //    locate pattern in the index
         hash_type get_result();
         void print_result(const hash_type &hash_map); //  print information about index structures
-        void print_stats();                           //  just basic information about EDS extracted during the building
+        void print_stats();     
     };
 
 }

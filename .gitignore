@@ -1,2 +1,5 @@
 scripts/build/**
 experiments/**
+scripts/test/**
+!scripts/test/*.cpp
+!scripts/test/CMakeLists.txt

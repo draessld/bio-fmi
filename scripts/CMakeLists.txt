@@ -7,6 +7,9 @@ project(MyProject)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+include_directories(BEFORE ~/include)
+link_directories(BEFORE ~/lib)
+
 enable_testing()
 
 # Add the src directory to the project

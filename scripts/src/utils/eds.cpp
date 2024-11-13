@@ -1,4 +1,4 @@
-#include "eds.h"
+#include "eds.hpp"
 
 EDS::EDS(std::istream &is){
 
@@ -19,18 +19,41 @@ EDS::EDS(std::istream &is){
     n_common = 0;
     l_common = 0;
     n_empty_strings = 0;
-
+    size_t ri = 0;
+    
     char ch;
     while (is.get(ch))
     {
-        original_eds.push_back(ch);
+        // original_eds.push_back(ch);
+        // changes[chi].push_back(ch);
         switch (ch)
         {
         case '{':
+            if (!line.empty())
+            {
+                //  reference before
+                changes.push_back(line);
+                lengths.push_back(line.size());
+                set_size_.push_back(1);
+                n++;
+                m++;
+
+                if (line.size() > max_l)
+                    max_l = line.size();
+                if (line.size() < min_l)
+                    min_l = line.size();
+            }
+            N+=line.size();
             local_m =1;
             n++;
+            line.clear();
             break;
         case '}':
+            changes.push_back(line);
+            if (line.empty()){
+                //  an empty string
+                n_empty_strings++;
+            }
             if (local_m == 1){
                 n_common++;
                 l_common+=line.size();
@@ -39,14 +62,15 @@ EDS::EDS(std::istream &is){
                     max_l = line.size();
                 if (line.size() < min_l)
                     min_l = line.size();
-                // std::cout << line.size() << ","<< int(min_l) << ","<< int(max_l) << std::endl;
             }
+            set_size_.push_back(local_m);
             m+=local_m; //  add number of string in current set
-            // local_m = 0;
             N+=line.size();
             line.clear();
             break;
         case ',':
+            changes.push_back(line);
+            lengths.push_back(line.size());
             if (line.empty()){
                 //  an empty string
                 n_empty_strings++;
@@ -55,11 +79,30 @@ EDS::EDS(std::istream &is){
             N+=line.size();
             line.clear();
             break;
+        case '\n':
+            break;
         default:
             line.push_back(ch);
             break;
         }
     }
+    if (!line.empty()){
+        //  reference in the end
+        changes.push_back(line);
+        lengths.push_back(line.size());
+        set_size_.push_back(1);
+        n++;
+        N+=line.size();
+        m++;
+
+        if (line.size() > max_l)
+            max_l = line.size();
+        if (line.size() < min_l)
+            min_l = line.size();
+
+        line.clear();
+    }
+
     if (n_common==0)
     {
         avg_l = 0;
@@ -67,10 +110,6 @@ EDS::EDS(std::istream &is){
         avg_l = l_common / n_common;
     }
     
-}
-
-EDS::~EDS() {
-    // Destructor implementation (if needed)
 }
 
 int EDS::stats(){
@@ -83,6 +122,18 @@ int EDS::stats(){
     std::cout << "max_l:" << int(max_l) << std::endl;
     std::cout << "avg_l:" << int(avg_l) << std::endl;
     std::cout << "empty string:" << int(n_empty_strings) << std::endl;
+    std::cout << "changes:" << changes.size() << std::endl;
+        for (auto change : changes)
+    {
+        std::cout << change << ", ";
+    }
+    std::cout <<std::endl;
+    std::cout << "sets:" << set_size_.size() << std::endl;
 
+        for (auto set : set_size_)
+    {
+        std::cout << set << ", ";
+    }
+    std::cout <<std::endl;
     return 0;
 }

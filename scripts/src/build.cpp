@@ -2,8 +2,8 @@
 #include <fstream>
 #include <sstream>
 
-#include "utils/eds.h"
-#include "utils/index.h"
+#include "utils/eds.hpp"
+#include "utils/index.hpp"
 
 #include <boost/program_options.hpp>
 
@@ -43,15 +43,6 @@ int handle_parameters(int argc, const char **argv)
             std::cout << desc << std::endl;
 
             return 1;
-        }
-
-        if ((vm.count("eds-file") == 0) && (vm.count("msa-file") == 0))
-        {
-            std::cout << "Error: No input given" << std::endl;
-
-            std::cout << "Usage: " << argv[0] << " " << usage << std::endl
-                      << std::endl;
-            return -1;
         }
 
 
@@ -94,8 +85,13 @@ int main(int argc, char const *argv[])
     }
     else  // If the file can be opened, treat input as a file
     {
-        EDS eds(ifs);
-        eds.stats();
+        // EDS eds(ifs);
+        // eds.stats();
+        // Bio_FMi index = Bio_FMi(eds,l);
+        Bio_FMi index = Bio_FMi(in_file,l);
+        index.build();
+            
+    
     }
     
     return 0;

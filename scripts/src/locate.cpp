@@ -1,9 +1,10 @@
 #include <filesystem>
 #include <string>
 #include <iostream>
+#include <fstream>
 
 #include "utils/utils.hpp"
-#include "utils/index.h"
+#include "utils/index.hpp"
 
 #include <boost/program_options.hpp>
 
@@ -77,6 +78,70 @@ int handle_parameters(int argc, const char **argv)
 /*  create index and run experiments   */
 void run()
 {
+    auto time_baseline = std::chrono::high_resolution_clock::now();
+    std::vector<double> times;
+    std::vector<std::string> patterns;
+    std::string line;
+
+    Bio_FMi *index = new Bio_FMi(in_file);
+
+    index->print();
+
+    // /*  read patterns  */
+    if (!pattern.empty())
+        patterns.push_back(pattern);
+
+    if (!pattern_file.empty()){
+        std::ifstream pfile(pattern_file);
+        if (!pfile.is_open()) {
+            std::cerr << "Error opening file!" << std::endl;
+        }
+        while (std::getline(pfile, line)) {
+            patterns.push_back(line);
+        }
+    }
+
+    double total_time = 0;
+    int total_occurences = 0;
+    int p_occurences = 0;
+
+    std::cout << "Number of patterns n = " << patterns.size() << std::endl;
+
+    /*  search patterns  */
+    for (auto P : patterns)
+    {
+        p_occurences = 0;
+
+        time_baseline = std::chrono::high_resolution_clock::now();
+        index->locate(P);
+        auto time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - time_baseline);
+        times.push_back(time.count());
+
+        auto result = index->get_result();
+        for (auto &pos : result)
+        {
+            p_occurences += pos.second.size();
+            // for (auto &res: pos.second)
+            // {
+            // std::cout << "hop" << std::endl;
+            // if(check_result(eds,res.first,P.size(),res.second) != P)
+            //     std::cout << "Invalid result starting of pattern: " << P << " starting on position: " << res.first << " with changes: " << res.second << std::endl;            }
+        }
+        std::cout << ">" << P << '\t' << p_occurences << '\t' << times.back() << std::endl;
+        index->print_result(result);
+        total_occurences += p_occurences;
+    }
+    total_time = std::reduce(times.begin(), times.end());
+    // std::cout << "Peak RAM usage: " << double(get_mem_usage() - mem_baseline) / double(patterns.size()) << " kB" << std::endl;
+    std::cout << "Average number of occurrences per pattern: " << total_occurences / patterns.size() << std::endl;
+    std::cout << "Total number of occurrences: " << total_occurences << std::endl;
+    std::cout << "Total time: " << total_time << " microseconds" << std::endl;
+    std::cout << "Average time per pattern: " << total_time / patterns.size() << " microseconds" << std::endl;
+    std::cout << "Average time per occurence: " << total_time / total_occurences << " microseconds" << std::endl;
+
+    delete index;
+
+
     // long mem_baseline;
     // auto time_baseline = std::chrono::high_resolution_clock::now();
     // std::vector<double> times;

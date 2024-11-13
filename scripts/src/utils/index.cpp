@@ -1,4 +1,4 @@
-#include "index.h"
+#include "index.hpp"
 
 namespace bio_fmi
 {
@@ -22,6 +22,130 @@ namespace bio_fmi
 
         changes_filepath_ = index_bed_;
         changes_filepath_.replace_extension(ext + ".metadata.chan");
+    }
+
+int Bio_FMi::parse_eds()
+    {
+
+        std::ifstream ifs(eds_file_);
+        if (!ifs.is_open())
+        {
+            std::cerr << "Error: Unable to open eds file " << eds_file_ << std::endl;
+            return -3;
+        }
+
+        EDS eds(ifs);
+        ifs.close();
+        unsigned int cl = context_length_ -1;
+        std::string context_r("");
+        std::string context_l("");
+
+        std::string T0("#");
+        std::string Td("#");
+        size_t chi = 0;
+        bool ref = false;
+        int basePos = 0;
+        int setSize = 0;
+
+        if(eds.set_size_[0] == 1)
+            ref = true;  
+
+        for (size_t x = 0; x < eds.n; x++){
+            if (ref)
+            {   
+                base_position_.push_back(basePos);
+                basePos += eds.changes[chi].size();
+                T0+=eds.changes[chi];
+                T0+='#';
+                context_l = eds.changes[chi].substr(eds.changes[chi].size()-cl,cl);
+            }else{
+                set_size_.push_back(setSize);
+                setSize += eds.set_size_[x]; 
+                if ((chi + eds.set_size_[x]) >= eds.m){
+                    context_r = "";    
+                }else{
+                    context_r = eds.changes[chi + eds.set_size_[x]].substr(0,cl);
+                }
+                                
+                for (size_t i = chi; i < (chi + eds.set_size_[x]); i++)
+                {
+                    offset_.push_back(eds.changes[i].size());
+                    Td+=context_l;
+                    Td+=eds.changes[i];
+                    Td+=context_r;
+                    Td+='#';
+                }
+            }
+            
+            ref = !ref;
+            chi += eds.set_size_[x];
+        }
+
+        n = eds.n;
+        m = eds.m;
+        N = eds.N;
+
+        // std::cout << T0<< std::endl;
+        // std::cout << Td << std::endl;
+
+        std::ofstream ref_file(reference_filepath_, std::ios::out);
+        std::ofstream chan_file(changes_filepath_, std::ios::out);
+        if (!ref_file.is_open() || !chan_file.is_open())
+        {
+            std::cerr << "Error: Unable to open metadata file " << eds_file_ << std::endl;
+            return -3;
+        }
+
+        ref_file << T0;
+        chan_file << Td;
+
+        ref_file.close();
+        chan_file.close();
+
+        std::ifstream file(changes_filepath_, std::ios::binary);
+        //  create inary vectors
+        file.seekg(0, file.end);
+        size_t pos = file.tellg();
+        file.seekg(0, file.beg);
+        loc_ = sdsl::bit_vector(pos, 0);
+        iloc_ = sdsl::bit_vector(pos, 0);
+        int i = 0;
+        char c;
+        chi = 0;
+        int si = 0;
+        while (file.get(c))
+        {
+            if (c == '#'){
+                chi++;
+                loc_[i] = 1;
+            }
+            if (chi-1 == set_size_[si])
+            {
+                si++;
+                iloc_[i] = 1;
+            }
+            i++;
+        }
+        iloc_[pos - 1] = 1;
+
+        file.close();
+
+        std::ifstream file_ref(reference_filepath_, std::ios::binary);
+        //  create inary vectors
+        file_ref.seekg(0, file_ref.end);
+        pos = file_ref.tellg();
+        file_ref.seekg(0, file_ref.beg);
+        tloc_ = sdsl::bit_vector(pos, 0);
+        i = 0;
+        while (file_ref.get(c))
+        {
+            if (c == '#')
+                tloc_[i] = 1;
+            i++;
+        }
+
+        file_ref.close();
+        return 0;
     }
 
     Bio_FMi::Bio_FMi(std::filesystem::path index_folder)
@@ -66,192 +190,12 @@ namespace bio_fmi
     {
     }
 
-    int Bio_FMi::parse_eds()
-    {
-        //  open file
-        std::ifstream in(eds_file_);
-        if (!in.is_open())
-        {
-            std::cerr << "Error: Unable to open file " << eds_file_ << std::endl;
-            return -1;
-        }
-
-        std::ofstream ref_file(reference_filepath_, std::ios::out);
-        std::ofstream chan_file(changes_filepath_, std::ios::out);
-        if (!ref_file.is_open() || !chan_file.is_open())
-        {
-            std::cerr << "Error: Unable to open metadata file " << eds_file_ << std::endl;
-            return -3;
-        }
-
-        //  Data are validated for context length long enough
-        std::string r_context, l_context; // keep context of length -1 (to search pattern of length 5 keep 4 characters of contexts)
-        size_t cl_lessone = context_length_ - 1;
-
-        set_size_.push_back(0);
-        std::vector<std::string> changes;
-        std::vector<int> start_positions_;
-        size_t nchange = 0;
-
-        bool context = 0; //  which context save 0=left,1=right
-        bool change_open = false;
-
-        chan_file << '#';
-
-        size_t i = 0;
-        char c;
-        while (in.get(c))
-        {
-            // std::cout << c << std::endl;
-            switch (c)
-            {
-            case '{':
-                base_position_.push_back(i);
-                n++;
-                //  flush ref
-                ref_file << l_context;
-
-                if (!changes.empty())
-                {
-                    set_size_.push_back(set_size_.back());
-                    set_size_.back() += changes.size();
-                    ref_file << '#';
-                }
-
-                //  flush changes
-                start_positions_.push_back((size_t)chan_file.tellp() - 1);
-                for (size_t k = 0; k < changes.size(); k++)
-                {
-                    if (l_context.size() > cl_lessone)
-                        chan_file << l_context.substr(l_context.size() - cl_lessone, cl_lessone);
-                    else
-                        chan_file << l_context;
-
-                    chan_file << changes[k];
-                    chan_file << r_context.substr(0, cl_lessone);
-                    chan_file << '#';
-                    offset_.push_back(changes[k].size());
-                }
-                l_context = r_context;
-                r_context.clear();
-                changes.clear();
-                changes.push_back("");
-                ;
-
-                //  setup open degenerate symbol
-                nchange = 0;
-                change_open = true;
-                break;
-            case '}':
-                context = context ^ 1;
-                change_open = false;
-                break;
-            case ',':
-                total_deg_strings++;
-                changes.push_back("");
-                nchange++;
-                break;
-            default:
-                //  its character
-                if (change_open)
-                {
-                    //  character belongs to string in degenerate set
-                    changes[nchange].push_back(c);
-                }
-                else
-                {
-                    //  character belongs to common part
-                    r_context.push_back(c);
-                    i++;
-                }
-                break;
-            }
-        }
-
-        N = i;
-        //  flush ref
-        ref_file << l_context;
-        if (!changes.empty())
-        {
-            set_size_.push_back(set_size_.back());
-            set_size_.back() += changes.size();
-            ref_file << '#';
-        }
-        ref_file << r_context;
-
-        //  flush changes
-        start_positions_.push_back((size_t)chan_file.tellp() - 1);
-        for (size_t k = 0; k < changes.size(); k++)
-        {
-            if (l_context.size() >= cl_lessone)
-                chan_file << l_context.substr(l_context.size() - cl_lessone, cl_lessone);
-            else
-                chan_file << l_context;
-
-            chan_file << changes[k];
-            if (r_context.size() > cl_lessone)
-                chan_file << r_context.substr(r_context.size() - context_length_, cl_lessone);
-            else
-                chan_file << r_context;
-            chan_file << '#';
-            offset_.push_back(changes[k].size());
-        }
-
-        in.close();
-        ref_file.close();
-        chan_file.close();
-
-        n = (n * 2) + 1;
-
-        // base_position_.erase(base_position_.begin());
-
-        std::ifstream file(changes_filepath_, std::ios::binary);
-        //  create inary vectors
-        file.seekg(0, file.end);
-        size_t pos = file.tellg();
-        file.seekg(0, file.beg);
-        loc_ = sdsl::bit_vector(pos, 0);
-        iloc_ = sdsl::bit_vector(pos, 0);
-        i = 0;
-        while (file.get(c))
-        {
-            if (c == '#')
-                loc_[i] = 1;
-            i++;
-        }
-
-        for (i = 0; i < start_positions_.size(); i++)
-        {
-            iloc_[start_positions_[i]] = 1;
-        }
-        iloc_[pos - 1] = 1;
-
-        file.close();
-
-        std::ifstream file_ref(reference_filepath_, std::ios::binary);
-        //  create inary vectors
-        file_ref.seekg(0, file_ref.end);
-        pos = file_ref.tellg();
-        file_ref.seekg(0, file_ref.beg);
-        tloc_ = sdsl::bit_vector(pos, 0);
-        i = 0;
-        while (file_ref.get(c))
-        {
-            if (c == '#')
-                tloc_[i] = 1;
-            i++;
-        }
-
-        file_ref.close();
-
-        return 0;
-    }
-
     int Bio_FMi::build()
     {
         try
         {
             std::cout << "  (0/3) Parsing EDS";
+
             if (Bio_FMi::parse_eds())
             {
                 std::cout << "Error: Uncomplete EDS parsing" << std::endl;
@@ -617,8 +561,9 @@ namespace bio_fmi
         std::cout << "iloc:                 " << iloc_ << std::endl;
         std::cout << "tloc:                 " << tloc_ << std::endl;
         std::cout << "Context length: " << context_length_ << std::endl;
-        std::cout << "Number of segments: " << n << std::endl;
-        std::cout << "Number of changes: " << total_deg_strings << std::endl;
+        std::cout << "N: " << N << std::endl;
+        std::cout << "n: " << n << std::endl;
+        std::cout << "m: " << m << std::endl;
         std::cout << std::endl;
 
         std::cout << "aBasePos: ";
@@ -643,7 +588,7 @@ namespace bio_fmi
         // std::cout << "n: " << n << std::endl;
         // std::cout << "N: " << N << std::endl;
         // std::cout << "# denegenerated sets: " << total_deg_sets << std::endl;
-        // std::cout << "# strings in deg-sets: " << total_deg_strings << std::endl;
+        // std::cout << "# strings in deg-sets: " << m << std::endl;
         std::cout << "Total index size: " << total_index_size_ << std::endl;
         std::cout << std::endl;
     }
