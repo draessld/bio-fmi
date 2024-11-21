@@ -1,5 +1,21 @@
 #include "index.hpp"
 
+double getFolderSize(const std::filesystem::path &folderPath)
+{
+    std::uintmax_t totalSize = 0;
+
+    // Iterate through each file and subdirectory in the folder
+    for (const auto &entry : std::filesystem::recursive_directory_iterator(folderPath))
+    {
+        if (std::filesystem::is_regular_file(entry.status()))
+        { // Only count regular files
+            totalSize += std::filesystem::file_size(entry.path());
+        }
+    }
+    double totalSizeMB = static_cast<double>(totalSize) / (1024 * 1024); // Convert to MB
+    return totalSizeMB;
+}
+
 namespace bio_fmi
 {
 
@@ -24,10 +40,153 @@ namespace bio_fmi
         changes_filepath_.replace_extension(ext + ".metadata.chan");
     }
 
-int Bio_FMi::parse_eds()
+        Bio_FMi::Bio_FMi(EDS eds, int context_length)
+        : context_length_(context_length), eds(eds)
+    {
+        //  create folder for the index
+        std::string name = "eds_index."+std::to_string(context_length);
+        std::string ext = ".leds";
+        index_bed_ = std::filesystem::current_path() / (name + ext + ".index");
+
+        std::cout << "Index destination on " << index_bed_ << std::endl;
+        if (!std::filesystem::exists(index_bed_))
+            std::filesystem::create_directories(index_bed_);
+        index_bed_.append(name);
+
+        //  metadata files - for reference string and the string of changes
+        reference_filepath_ = index_bed_;
+        reference_filepath_.replace_extension(ext + ".metadata.ref");
+
+        changes_filepath_ = index_bed_;
+        changes_filepath_.replace_extension(ext + ".metadata.chan");
+    }
+
+    int Bio_FMi::parse_eds()
+        {
+
+            if (eds.empty())
+            {
+                std::ifstream ifs(eds_file_);
+                if (!ifs.is_open())
+                {
+                    std::cerr << "Error: Unable to open eds file " << eds_file_ << std::endl;
+                    return -3;
+                }
+                eds = EDS(ifs);
+                ifs.close();
+            }
+
+            std::ofstream ref_file(reference_filepath_, std::ios::out);
+            std::ofstream chan_file(changes_filepath_, std::ios::out);
+            if (!ref_file.is_open() || !chan_file.is_open())
+            {
+                std::cerr << "Error: Unable to open metadata file " << eds_file_ << std::endl;
+                return -3;
+            }
+
+            unsigned int cl = context_length_ -1;
+            std::string context_r("");
+            std::string context_l("");
+
+            ref_file<<"#";
+            chan_file<<"#";
+            
+            size_t chi = 0;
+            bool ref = false;
+            int basePos = 0;
+            int setSize = 0;
+            tloc_ = sdsl::bit_vector(eds.l_common + eds.n_common + 1, 0);
+            loc_ = sdsl::bit_vector(eds.N + (eds.m * cl *2), 0);
+            iloc_ = sdsl::bit_vector(eds.N + (eds.m * cl *2), 0);
+
+            tloc_[0] = 1;
+            loc_[0] = 1;
+            iloc_[0] = 1;
+            std::streampos pos;
+
+            if (!eds.is_ref[0])
+            {
+                base_position_.push_back(0);
+            }
+            
+
+            for (size_t x = 0; x < eds.n; x++){
+                if (eds.is_ref[x])
+                {
+                    basePos += eds.changes[chi].size();
+                    base_position_.push_back(basePos);
+                    ref_file << eds.changes[chi];
+                    tloc_[ref_file.tellp()] = 1;
+                    ref_file << '#';
+                    // std::cout << eds.changes[chi].size() << ',' << cl <<std::endl;
+                    if(eds.changes[chi].size() < cl){
+                        // std::cout << "if" << std::endl;
+                        context_l = eds.changes[chi];
+                    }else{
+                        // std::cout << "else" << std::endl;
+                        context_l = eds.changes[chi].substr(eds.changes[chi].size()-cl,cl);
+                    }
+                }else{
+                    setSize += eds.set_size[x];
+                    set_size_.push_back(setSize);
+                    if ((chi + eds.set_size[x]) >= eds.m){
+                        context_r = "";
+                    }else{
+                        // std::cout << eds.set_size[x]<<','<<eds.changes[chi + eds.set_size[x]].size()<< ',' << cl << std::endl;
+                        if(cl > eds.changes[chi + eds.set_size[x]].size()){
+                        // std::cout << "if2" << std::endl;
+                            context_r = eds.changes[chi + eds.set_size[x]];
+                        }else{
+                        // std::cout << "else2" << std::endl;
+                            context_r = eds.changes[chi + eds.set_size[x]].substr(0,cl);
+                        }
+                    }
+
+                    for (size_t i = chi; i < (chi + eds.set_size[x]); i++)
+                    {
+                        offset_.push_back(eds.changes[i].size());
+                        chan_file << context_l;
+                        chan_file << eds.changes[i];
+                        chan_file << context_r;
+                        pos = chan_file.tellp(); 
+                        loc_[pos] = 1;
+                        chan_file << '#';
+                    }
+                    iloc_[pos] = 1;
+                
+                }
+
+                chi += eds.set_size[x];
+            }
+
+            n = eds.n;
+            m = eds.m;
+            N = eds.N;
+
+            // std::cout << T0<< std::endl;
+            // std::cout << Td << std::endl;
+
+            // std::ofstream ref_file(reference_filepath_, std::ios::out);
+            // std::ofstream chan_file(changes_filepath_, std::ios::out);
+            // if (!ref_file.is_open() || !chan_file.is_open())
+            // {
+            //     std::cerr << "Error: Unable to open metadata file " << eds_file_ << std::endl;
+            //     return -3;
+            // }
+
+            // ref_file << T0;
+            // chan_file << Td;
+
+            ref_file.close();
+            chan_file.close();
+
+            return 0;
+        }
+/*
+    int Bio_FMi::parse_eds()
     {
 
-        std::ifstream ifs(eds_file_);
+        std::ifstream ifs(eds_file_, std::ios::in | std::ios::binary);
         if (!ifs.is_open())
         {
             std::cerr << "Error: Unable to open eds file " << eds_file_ << std::endl;
@@ -35,58 +194,8 @@ int Bio_FMi::parse_eds()
         }
 
         EDS eds(ifs);
-        ifs.close();
-        unsigned int cl = context_length_ -1;
-        std::string context_r("");
-        std::string context_l("");
-
-        std::string T0("#");
-        std::string Td("#");
-        size_t chi = 0;
-        bool ref = false;
-        int basePos = 0;
-        int setSize = 0;
-
-        if(eds.set_size_[0] == 1)
-            ref = true;  
-
-        for (size_t x = 0; x < eds.n; x++){
-            if (ref)
-            {   
-                base_position_.push_back(basePos);
-                basePos += eds.changes[chi].size();
-                T0+=eds.changes[chi];
-                T0+='#';
-                context_l = eds.changes[chi].substr(eds.changes[chi].size()-cl,cl);
-            }else{
-                set_size_.push_back(setSize);
-                setSize += eds.set_size_[x]; 
-                if ((chi + eds.set_size_[x]) >= eds.m){
-                    context_r = "";    
-                }else{
-                    context_r = eds.changes[chi + eds.set_size_[x]].substr(0,cl);
-                }
-                                
-                for (size_t i = chi; i < (chi + eds.set_size_[x]); i++)
-                {
-                    offset_.push_back(eds.changes[i].size());
-                    Td+=context_l;
-                    Td+=eds.changes[i];
-                    Td+=context_r;
-                    Td+='#';
-                }
-            }
-            
-            ref = !ref;
-            chi += eds.set_size_[x];
-        }
-
-        n = eds.n;
-        m = eds.m;
-        N = eds.N;
-
-        // std::cout << T0<< std::endl;
-        // std::cout << Td << std::endl;
+        ifs.clear();
+        ifs.seekg(0, std::ios::beg);
 
         std::ofstream ref_file(reference_filepath_, std::ios::out);
         std::ofstream chan_file(changes_filepath_, std::ios::out);
@@ -96,57 +205,144 @@ int Bio_FMi::parse_eds()
             return -3;
         }
 
-        ref_file << T0;
-        chan_file << Td;
+        unsigned int cl = context_length_ - 1;
+        std::string context_r("");
+        std::string context_l("");
+
+        std::string T0("#");
+        std::string Td("#");
+        ref_file << '#';
+        chan_file << '#';
+
+        unsigned int chi = 0;
+        int basePos = 0;
+        int setSize = 0;
+        char c;
+        // char* buffer;
+        std::string buffer;
+
+        for (size_t x = 0; x < eds.n; x++)
+        {
+            if (eds.is_ref[x])
+            {
+                base_position_.push_back(basePos);
+                basePos += eds.changes[chi].size();
+
+                buffer.resize(eds.lengths[chi], '\0');
+                ifs.seekg(eds.base_position[chi]);
+                ifs.read(&buffer[0], eds.lengths[chi]);
+                ref_file << buffer;
+                // T0+=eds.changes[chi];
+                // T0+='#';
+                ref_file << '#';
+
+                //  TODO
+                context_l = eds.changes[chi].substr(eds.changes[chi].size() - cl, cl);
+            }
+            else
+            {
+                set_size_.push_back(setSize);
+                setSize += eds.set_size[x];
+                if ((chi + eds.set_size[x]) >= eds.m)
+                {
+                //  TODO
+                    context_r = "";
+                }
+                else
+                {
+                    //  TODO
+                    // context_r = eds.changes[chi + eds.set_size[x]].substr(0, cl);
+
+
+                    buffer.resize(cl, '\0');
+                    ifs.seekg(eds.base_position[chi]);
+                    ifs.read(&buffer[0], cl);
+                }
+
+                for (size_t i = chi; i < (chi + eds.set_size[x]); i++)
+                {
+                    offset_.push_back(eds.lengths[i]);
+
+                    buffer.resize(eds.lengths[i], '\0');
+                    ifs.seekg(eds.base_position[i]);
+                    ifs.read(&buffer[0], eds.lengths[i]);
+
+                    // Td += context_l;
+                    // Td += eds.changes[i];
+                    // Td += context_r;
+                    // Td += '#';
+                    chan_file << context_l;
+                    chan_file << buffer;
+                    chan_file << context_r;
+
+                    chan_file << '#';
+                }
+            }
+
+            chi += eds.set_size[x];
+        }
+
+        n = eds.n;
+        m = eds.m;
+        N = eds.N;
+
+        // std::cout << T0<< std::endl;
+        // std::cout << Td << std::endl;
+
+        ifs.close();
+
+        // ref_file << T0;
+        // chan_file << Td;
 
         ref_file.close();
         chan_file.close();
 
-        std::ifstream file(changes_filepath_, std::ios::binary);
-        //  create inary vectors
-        file.seekg(0, file.end);
-        size_t pos = file.tellg();
-        file.seekg(0, file.beg);
-        loc_ = sdsl::bit_vector(pos, 0);
-        iloc_ = sdsl::bit_vector(pos, 0);
-        int i = 0;
-        char c;
-        chi = 0;
-        int si = 0;
-        while (file.get(c))
-        {
-            if (c == '#'){
-                chi++;
-                loc_[i] = 1;
-            }
-            if (chi-1 == set_size_[si])
-            {
-                si++;
-                iloc_[i] = 1;
-            }
-            i++;
-        }
-        iloc_[pos - 1] = 1;
+        // std::ifstream file(changes_filepath_, std::ios::binary);
+        // //  create inary vectors
+        // file.seekg(0, file.end);
+        // size_t pos = file.tellg();
+        // file.seekg(0, file.beg);
+        loc_ = sdsl::bit_vector(set_size_.size(), 0);
+        iloc_ = sdsl::bit_vector(set_size_.size(), 0);
+        // int i = 0;
+        // char c;
+        // chi = 0;
+        // int si = 0;
+        // while (file.get(c))
+        // {
+        //     if (c == '#'){
+        //         chi++;
+        //         loc_[i] = 1;
+        //     }
+        //     if (chi-1 == set_size_[si])
+        //     {
+        //         si++;
+        //         iloc_[i] = 1;
+        //     }
+        //     i++;
+        // }
+        // iloc_[pos - 1] = 1;
 
-        file.close();
+        // file.close();
 
-        std::ifstream file_ref(reference_filepath_, std::ios::binary);
-        //  create inary vectors
-        file_ref.seekg(0, file_ref.end);
-        pos = file_ref.tellg();
-        file_ref.seekg(0, file_ref.beg);
-        tloc_ = sdsl::bit_vector(pos, 0);
-        i = 0;
-        while (file_ref.get(c))
-        {
-            if (c == '#')
-                tloc_[i] = 1;
-            i++;
-        }
+        // std::ifstream file_ref(reference_filepath_, std::ios::binary);
+        // //  create inary vectors
+        // file_ref.seekg(0, file_ref.end);
+        // pos = file_ref.tellg();
+        // file_ref.seekg(0, file_ref.beg);
+        tloc_ = sdsl::bit_vector(n, 0);
+        // i = 0;
+        // while (file_ref.get(c))
+        // {
+        //     if (c == '#')
+        //         tloc_[i] = 1;
+        //     i++;
+        // }
 
-        file_ref.close();
+        // file_ref.close();
         return 0;
     }
+    */
 
     Bio_FMi::Bio_FMi(std::filesystem::path index_folder)
     {
@@ -160,27 +356,27 @@ int Bio_FMi::parse_eds()
 
         // Extract the number from the filename
 
-        size_t i = filename.size() - 5;
-        for (; i > 0; i--)
-        {
-            if (filename[i] == '.')
-                break;
-        }
-        std::string number_str = filename.substr(i + 1, filename.size() - i - 5);
-        context_length_ = 0;
-        // Convert the extracted string to an integer
-        try
-        {
-            context_length_ = std::stoi(number_str);
-            std::cout << "Context length was found as : " << context_length_ << std::endl;
+        // size_t i = filename.size() - 3;
+        // for (; i > 0; i--)
+        // {
+        //     if (filename[i] == '.')
+        //         break;
+        // }
+        // std::string number_str = filename.substr(i + 1, filename.size() - i - 5);
+        // context_length_ = 0;
+        // // Convert the extracted string to an integer
+        // try
+        // {
+        //     context_length_ = std::stoi(number_str);
+        //     std::cout << "Context length was found as : " << context_length_ << std::endl;
 
-            // Print the extracted number
-        }
-        catch (const std::exception &e)
-        {
-            std::cerr << "Error: context length was not found. Please setup explicitly: " << std::endl;
-            std::cin >> context_length_;
-        }
+        //     // Print the extracted number
+        // }
+        // catch (const std::exception &e)
+        // {
+        //     std::cerr << "Error: context length was not found. Please setup explicitly: " << std::endl;
+        //     std::cin >> context_length_;
+        // }
 
         load();
         // print();
@@ -201,6 +397,7 @@ int Bio_FMi::parse_eds()
                 std::cout << "Error: Uncomplete EDS parsing" << std::endl;
                 return -1;
             }
+
             std::cout << " ... done" << std::endl;
 
             std::cout << "  (1/3) Building fm-index over reference string";
@@ -270,7 +467,7 @@ int Bio_FMi::parse_eds()
         }
     }
 
-    int Bio_FMi::locate(std::string P)
+    int Bio_FMi::locate(const std::string& P)
     {
         new_hash_map_.clear();
         old_hash_map_.clear();
@@ -292,7 +489,7 @@ int Bio_FMi::parse_eds()
         bool previous_outside_change = false;
         // bool next_in_change = false;
 
-        /*  check pattern length and set the */
+        //  check pattern length and set the 
         //  if the pattern size is not divisible by the context_length split tha last two chunk into evenly parts
         if ((P.size() % context_length_) != 0)
         {
@@ -300,18 +497,18 @@ int Bio_FMi::parse_eds()
             return -1;
         }
 
-        /*  for each chunk */
+        //  for each chunk 
         for (chunk_index = 0; chunk_index < (P.size() / context_length_); chunk_index++)
         {
             chunk_start_position = chunk_index * context_length_;
             chunk = P.substr(chunk_start_position, context_length_);
             // std::cout << "Searching for a chunk number: " << chunk_index << " starting on position in pattern P:" << chunk_start_position << "=" << chunk << std::endl;
 
-            /*  SEARCH in reference */
+            //  SEARCH in reference 
             auto ref_locations = sdsl::locate(reference_index_, chunk);
             // std::cout << "in I0: " << ref_locations.size() << std::endl;
 
-            // /*  SEARCH in changes */
+            // //  SEARCH in changes 
             auto change_locations = sdsl::locate(changes_index_, chunk);
             // std::cout << "in Id: " << change_locations.size() << std::endl;
 
@@ -325,7 +522,7 @@ int Bio_FMi::parse_eds()
                 // std::cout << "next position in change: " << next_in_change << std::endl;
 
                 loc = loc - block_number + 1;
-                // std::cout << "chunk found on position: " << loc << ", block number: " << block_number << std::endl;
+                // std::cout << "chunk found on position: " << loc << " "<< loc - context_length_<< ", block number: " << block_number-1 << std::endl;
 
                 if (chunk_index == 0) //  first positions
                 {
@@ -340,28 +537,34 @@ int Bio_FMi::parse_eds()
                     {
                         for (auto occ : it->second)
                         {
+                            
+                            // std::cout << "set size: " << set_size_[block_number-1] << std::endl;
                             if (occ.second.empty())
                             {
                                 //  case 1
                                 // std::cout << "Case 1 found. Origin position " << occ.first << std::endl;
                                 new_hash_map_[loc].push_back(occ);
                             }
-                            else if (occ.second.back() <= set_size_[block_number])
+                            else if (occ.second.back() <= set_size_[block_number-1])
                             {
+                            // std::cout << occ.second.back() << std::endl;
                                 //  case 3
                                 // std::cout << "Case 3 found. Origin position " << occ.first << std::endl;
                                 //  check if it across any change
                                 if (occ.second.back() <= set_size_[block_number - 1])
                                 {
                                     // it lies in more than previous change set => the last must contains empty change
-                                    auto cp = occ;
-                                    cp.second.push_back(set_size_[block_number - 1] + 1); //  we expect that changes are ordered either lexicographicaly or by size = empty element is always first
-                                    new_hash_map_[loc].push_back(cp);
+                                    // auto cp = occ;
+                                    // cp.second.push_back(set_size_[block_number - 1] + 1); //  we expect that changes are ordered either lexicographicaly or by size = empty element is always first
+                                    new_hash_map_[loc].push_back(occ);
                                 }
                                 else
                                 {
                                     new_hash_map_[loc].push_back(occ);
                                 }
+                            }else{
+                                std::cout << occ.second.back() << std::endl;
+                                std::cout << "Here " << occ.first << std::endl;
                             }
                         }
                     }
@@ -376,22 +579,24 @@ int Bio_FMi::parse_eds()
                 block_number = riloc_(loc) - 1;
                 change_number = rloc_(loc);
                 pre_hash_loc = sloc_(change_number);
+
+                // std::cout << loc << "hehe"<<block_number << " " << change_number << " " << pre_hash_loc << std::endl;
+
                 // pos_hash_loc = sloc_(change_number + 1);
                 offset = loc - (pre_hash_loc + context_length_ - 1);
-
+                    previous_outside_change = ((pre_hash_loc) >= (loc - context_length_));
 
                 //  there could be empty context when the eds starts with set of changes
                 if (base_position_[block_number] < (context_length_ - 1))
                 {
                     //  context length is not full
                     //  1+5 > 7-5+1
-                    previous_outside_change = ((pre_hash_loc) >= (loc - context_length_));
+                    // std::cout << "here" << std::endl;
                     loc -= pre_hash_loc;
                 }
                 else
                 {
                     // previous_outside_change = ((pre_hash_loc + context_length_) > (loc - context_length_ + 1));
-                    previous_outside_change = ((pre_hash_loc) >= (loc - context_length_));
                     loc = base_position_[block_number] + offset;
                 }
 
@@ -411,14 +616,14 @@ int Bio_FMi::parse_eds()
 
                     int tmp = loc - offset;
                     // std::cout << "initial saving " << tmp << std::endl;
-                        if (new_hash_map_.find(loc - offset) == new_hash_map_.end())
-                            new_hash_map_[loc - offset] = {};
-                        new_hash_map_[loc - offset].push_back({loc, {change_number}});
+                    if (new_hash_map_.find(loc - offset) == new_hash_map_.end())
+                        new_hash_map_[loc - offset] = {};
+                    new_hash_map_[loc - offset].push_back({loc, {change_number}});
                 }
                 else
                 {
                     //  VALIDATE
-                    // std::cout << "Checking position" << loc - context_length_ << "in hash table" << std::endl;
+                    // std::cout << "Checking position " << loc - context_length_ << " in hash table" << std::endl;
 
                     if (!previous_outside_change)
                     {
@@ -458,6 +663,7 @@ int Bio_FMi::parse_eds()
                         it = old_hash_map_.find(loc - context_length_);
                         if (it != old_hash_map_.end())
                         {
+                            
                             for (auto occ : it->second)
                             {
 
@@ -482,6 +688,15 @@ int Bio_FMi::parse_eds()
                                     auto cp = occ;
                                     cp.second.push_back(change_number);
                                     new_hash_map_[loc - offset].push_back(cp);
+                                }else{
+                                    //  case 3 
+                                    // std::cout << "Case ???? found. Origin position " << occ.first << std::endl;
+                                    if (new_hash_map_.find(loc - offset) == new_hash_map_.end())
+                                        new_hash_map_[loc - offset] = {};
+
+                                    auto cp = occ;
+                                    cp.second.push_back(change_number);
+                                    new_hash_map_[loc - offset].push_back(cp);
                                 }
                             }
                         }
@@ -491,7 +706,8 @@ int Bio_FMi::parse_eds()
 
             // std::cout << std::endl;
 
-            if (new_hash_map_.empty()){
+            if (new_hash_map_.empty())
+            {
                 old_hash_map_.clear();
                 return -1;
             }
@@ -506,6 +722,7 @@ int Bio_FMi::parse_eds()
 
         return 0;
     }
+    
 
     int Bio_FMi::save()
     {
@@ -513,7 +730,7 @@ int Bio_FMi::parse_eds()
         {
             store_to_file(reference_index_, index_bed_.replace_extension(".ri")); // save I0
             store_to_file(changes_index_, index_bed_.replace_extension(".ci"));   //    save Id
-            // /*  save bit_vectors    */
+            // //  save bit_vectors    */
             store_to_file(loc_, index_bed_.replace_extension(".loc"));   //  save bitvector loc
             store_to_file(iloc_, index_bed_.replace_extension(".iloc")); //  save bitvector iloc
             store_to_file(tloc_, index_bed_.replace_extension(".tloc")); //  save bitvector iloc
@@ -561,9 +778,9 @@ int Bio_FMi::parse_eds()
         std::cout << "iloc:                 " << iloc_ << std::endl;
         std::cout << "tloc:                 " << tloc_ << std::endl;
         std::cout << "Context length: " << context_length_ << std::endl;
-        std::cout << "N: " << N << std::endl;
-        std::cout << "n: " << n << std::endl;
-        std::cout << "m: " << m << std::endl;
+        // std::cout << "N: " << N << std::endl;
+        // std::cout << "n: " << n << std::endl;
+        // std::cout << "m: " << m << std::endl;
         std::cout << std::endl;
 
         std::cout << "aBasePos: ";
@@ -585,11 +802,12 @@ int Bio_FMi::parse_eds()
     void Bio_FMi::print_stats()
     {
         std::cout << "Context length: " << context_length_ << std::endl;
-        // std::cout << "n: " << n << std::endl;
-        // std::cout << "N: " << N << std::endl;
-        // std::cout << "# denegenerated sets: " << total_deg_sets << std::endl;
-        // std::cout << "# strings in deg-sets: " << m << std::endl;
-        std::cout << "Total index size: " << total_index_size_ << std::endl;
+        std::cout << "n: " << n << std::endl;
+        std::cout << "N: " << N << std::endl;
+        std::cout << "m: " << m << std::endl;
+        std::cout << "EDS file size: " << std::filesystem::file_size(eds_file_) << " B" << std::endl;
+        std::cout << "Total index size: " << total_index_size_ << " MB" << std::endl;
+        std::cout << "index folder size: " << getFolderSize(index_bed_.parent_path()) << " MB" << std::endl;
         std::cout << std::endl;
     }
 

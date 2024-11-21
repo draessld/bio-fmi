@@ -21,6 +21,8 @@ int check_extension(std::string ext){
         return 1;
     }else if(ext == ".vcf"){
         return 2;
+    }else if((ext == ".eds") || (ext == ".edz")){
+        return 3;
     }else{
         return 0;
     }
@@ -94,7 +96,7 @@ int main(int argc, char const *argv[])
         out_file = in_file;
         if (l!=0)
         {
-            out_file.replace_extension(std::to_string(l)+".eds");
+            out_file.replace_extension(std::to_string(l)+".leds");
         }else{
             out_file.replace_extension(".eds");
         }   
@@ -126,7 +128,24 @@ int main(int argc, char const *argv[])
     case 2:
         /*  VCF */
         cout << "vcf" << endl;
-        TODO();
+        if (method == "linear")
+        {
+            TODO();
+        }
+        if(method == "cartesian"){
+            TODO();
+        }
+        break;
+    case 3:
+        /*  EDS */
+        cout << "eds" << endl;
+        if (method == "linear"){
+            TODO();
+        }
+        if(method == "cartesian"){
+            eds2leds_cartesian(ifs,ofs,l);
+        }
+
         break;
     default:
         cout << "Error: Unknow extension!" << endl;

@@ -20,12 +20,18 @@ std::filesystem::path in_file;
 std::filesystem::path out_file;
 std::filesystem::path pattern_file;
 bool benchmark = false;
+unsigned int l;
 
 /*  parse parameters   */
 int handle_parameters(int argc, const char **argv)
 {
     po::options_description desc("Parameters");
-    desc.add_options()("help,h", "display help message")("input,i", po::value<std::filesystem::path>(&in_file)->required(), "index file path")("output,o", po::value<std::filesystem::path>(&out_file), "")("pattern,p", po::value<std::string>(&pattern), "print occurences of every pattern")("pattern-file,P", po::value<std::filesystem::path>(&pattern_file), "input pattern file path (positional arg 2)")("benchmark", "run benchmark testing");
+    desc.add_options()("help,h", "display help message")
+    ("input,i", po::value<std::filesystem::path>(&in_file)->required(), "index file path")("output,o", po::value<std::filesystem::path>(&out_file), "")
+    ("context-length,l", po::value<unsigned int>(&l), "context_length")
+    ("pattern,p", po::value<std::string>(&pattern), "print occurences of every pattern")
+    ("pattern-file,P", po::value<std::filesystem::path>(&pattern_file), "input pattern file path (positional arg 2)")
+    ("benchmark", "run benchmark testing");
 
     po::positional_options_description posOptions;
 
@@ -84,7 +90,7 @@ void run()
     std::string line;
 
     Bio_FMi *index = new Bio_FMi(in_file);
-
+    index->context_length_ = l;
     index->print();
 
     // /*  read patterns  */
@@ -133,6 +139,7 @@ void run()
     }
     total_time = std::reduce(times.begin(), times.end());
     // std::cout << "Peak RAM usage: " << double(get_mem_usage() - mem_baseline) / double(patterns.size()) << " kB" << std::endl;
+    std::cout << "######" << std::endl;
     std::cout << "Average number of occurrences per pattern: " << total_occurences / patterns.size() << std::endl;
     std::cout << "Total number of occurrences: " << total_occurences << std::endl;
     std::cout << "Total time: " << total_time << " microseconds" << std::endl;

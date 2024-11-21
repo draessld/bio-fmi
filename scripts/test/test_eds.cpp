@@ -16,10 +16,10 @@ void create_eds1() {
 
     eds.stats();
 
-    assert(eds.n == eds.set_size_.size());
-    assert(eds.set_size_.size() == 18);
+    assert(eds.n == eds.set_size.size());
+    assert(eds.set_size.size() == 18);
     
-    int N = 0;
+    unsigned int N = 0;
     for (auto change : eds.changes)
         N += change.size(); 
 
@@ -42,10 +42,10 @@ void create_eds2() {
 
     eds.stats();
 
-    assert(eds.n == eds.set_size_.size());
-    assert(eds.set_size_.size() == 18);
+    assert(eds.n == eds.set_size.size());
+    assert(eds.set_size.size() == 18);
     
-    int N = 0;
+    unsigned int N = 0;
     for (auto change : eds.changes)
         N += change.size(); 
 
@@ -66,10 +66,10 @@ void create_eds3() {
     EDS eds = EDS(iss);
     eds.stats();
 
-    assert(eds.n == eds.set_size_.size());
-    assert(eds.set_size_.size() == 18);
+    assert(eds.n == eds.set_size.size());
+    assert(eds.set_size.size() == 18);
     
-    int N = 0;
+    unsigned int N = 0;
     for (auto change : eds.changes)
         N += change.size(); 
 
@@ -91,10 +91,10 @@ void create_eds4() {
     EDS eds = EDS(iss);
     eds.stats();
 
-    assert(eds.n == eds.set_size_.size());
-    assert(eds.set_size_.size() == 18);
+    assert(eds.n == eds.set_size.size());
+    assert(eds.set_size.size() == 18);
     
-    int N = 0;
+    unsigned int N = 0;
     for (auto change : eds.changes)
         N += change.size(); 
 

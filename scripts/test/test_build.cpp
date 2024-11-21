@@ -6,6 +6,7 @@
 
 #include "eds.hpp"
 #include "index.hpp"
+#include "utils.hpp"
 
 using namespace bio_fmi;
 
@@ -29,10 +30,37 @@ void build_from_eds() {
     // Bio_FMi index = Bio_FMi(eds,1);
 }
 
+void build_ref_files() {
+    std::vector<unsigned> test_contexts = {3,5,10};
+    std::filesystem::path basepath = "./test.eds";
+    std::filesystem::path path;
+
+    for (auto it: test_contexts)
+    {
+        path = basepath.replace_extension(std::to_string(it)+".leds");
+        std::cout << path;
+        if(std::filesystem::exists(path)){
+            //  build the index
+            Bio_FMi index = Bio_FMi(path,it);
+            index.build();
+            // index.print_stats();
+        }else{
+            std::ifstream ifs(basepath);
+            std::ofstream ofs(path);
+            eds2leds_cartesian(ifs,ofs,it);
+            Bio_FMi index = Bio_FMi(path,it);
+            index.build();
+            // index.print_stats();
+        }
+    }
+}
+
+
 int main(int argc, char const *argv[]) {
 
     build_from_file();
     build_from_eds();
+    build_ref_files();
     
     std::cout << "All tests passed!" << std::endl;
     return 0;

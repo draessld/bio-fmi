@@ -37,23 +37,17 @@ def stats(*args, **kwargs):
         out, err = p.communicate()
         yield out.decode(),file
 
-def build(*args, **kwargs):
-    files = args[0]
+def build(file,l):
     executable_path = f"{os.path.dirname(__file__)}/scripts/build/src/build"
-    for file in files:
-        index_dir = file+'.index'
-        print("Building",file,index_dir)
-        p = subprocess.Popen([executable_path,file,index_dir], stdout=subprocess.PIPE)
-        out, err = p.communicate()
-        yield out.decode(),index_dir
-        # yield "out",index_dir
+    index_dir = file+'.index'
+    p = subprocess.Popen([executable_path,'-i',file,'-o',index_dir,'-l',str(l)], stdout=subprocess.PIPE)
+    out, err = p.communicate()
+    return out.decode(),index_dir
+    # yield "out",index_dir
 
-def locate(*args, **kwargs):
-    print(f"#       Locating...")
-    if kwargs["type"] == 'SEQUENCE':
-        print("... as sequence")
-    else:
-        print("... as file")
+def locate(index, pattern_file):
+    executable_path = f"{os.path.dirname(__file__)}/scripts/build/src/locate"
+    p = subprocess.Popen([executable_path,'-i',index,'-o',index_dir,'-l',str(l)], stdout=subprocess.PIPE)
 
 def parse_range(value):
     try:
@@ -80,21 +74,24 @@ def main():
 
     parser_transform = subparsers.add_parser("transform", help="Create EDS or lEDS from MSA or VCF")
     parser_transform.add_argument("-l", required=False, type=parse_range, help="context length, can be given range in format a-b-c as from a to b by c steps")
-    parser_transform.add_argument("inputs", nargs='+', type=str, help="input in format of set of sequences, set of files or folder that contains given original files")
+    parser_transform.add_argument("inputs", nargs='+', type=list, help="input in format of set of sequences, set of files or folder that contains given original files")
     parser_transform.add_argument("-o","--output_bs", type=str, help="output basename")
     parser_transform.add_argument("--method", required=None ,type=str, help="")
 
     # Build command
     parser_build = subparsers.add_parser("build", help="Build index")
-    parser_build.add_argument("input", type=str, help="input in format of set of sequences, set of files or folder that contains given original files")
-    parser_build.add_argument("-o","--output_bs", type=str, default=None, help="output basename")
+    parser_build.add_argument("-l","--context_length", required=True, type=int, help="context length, can be given range in format a-b-c as from a to b by c steps")
+    parser_build.add_argument("inputs", nargs='+', type=str, help="input in format of set of sequences, set of files or folder that contains given original files")
+    parser_build.add_argument("-o","--output", type=argparse.FileType('w'), default=sys.stdout, help="output file")
     parser_build.add_argument("--rebuild", required=False, default=False, action='store_true', help="if minimized file already exists, it will be replaced by the new one")
 
     # Locate command
     parser_locate = subparsers.add_parser("locate", help="find MEMs of given patterns with respect to the tree data")
     parser_locate.add_argument("index", nargs='+', type=str, help="path to the index directory")
+    parser_locate.add_argument("-l","--context_length", required=True, type=int, help="context length")
     parser_locate.add_argument("-p", "--pattern", nargs='+', type=str, help="Patterns")
     parser_locate.add_argument("-P", "--pattern_files", nargs='+', type=str, help="A pattern file (one pattern per line)")
+    parser_locate.add_argument("-o","--output", type=argparse.FileType('w'), default=sys.stdout, help="output file")
     # parser_locate.add_argument("--rebuild", required=False, default=False, action='store_true', help="if output file already exists, it will be replaced by the new one")
 
     args = parser.parse_args()
@@ -104,9 +101,33 @@ def main():
         sys.exit(1)
 
     if args.command == "locate":
-        raise Exception("Not Implemented!")
+        indices = []
+        for input in args.index:
+            indices += glob.glob(input)
+
+        patterns = []
+        for pattern in args.pattern_files:
+            patterns += glob.glob(pattern)
+            
+
+        for index in indices:
+            for pattern in patterns:
+                print(index,pattern)
+
+
+    
     elif args.command == "build":
-        raise Exception("Not Implemented!")
+        files = []
+        for input in args.inputs:
+            files += glob.glob(input)
+
+        out_stream = args.output
+        for file in tqdm(files):
+            out_stream.write("Building " + file)
+            out,index_dir = build(file,args.context_length)
+            out_stream.write(out)
+            out_stream.flush()
+        
     elif args.command == "stats":
         # print(f"#Printin statistics about given eds files on {args.inputs}")
         files = []
@@ -123,6 +144,9 @@ def main():
                 out_stream.write(','.join([i.split(':')[1] for i in res.split('\n')[:-1]])+'\n')
             else:
                 out_stream.write(res+'\n')
+            
+            out_stream.flush()
+
     elif args.command == "transform":
         allowed_extensions = ["msa","vcf","eds"]
         allowed_methods = ["linear","cartesian"]

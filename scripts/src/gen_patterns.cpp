@@ -1,23 +1,20 @@
+#include <filesystem>
+#include <string>
 #include <iostream>
 #include <fstream>
-#include <sstream>
-
-#include "utils/eds.hpp"
-#include "utils/index.hpp"
-
+#include <sys/resource.h>
 #include <boost/program_options.hpp>
+#include "utils/eds.hpp"
 
 using namespace std;
-using namespace bio_fmi;
 namespace po = boost::program_options;
 
 std::string usage = "";
 std::string desc = "";
-std::string method;
 unsigned int l;
-std::filesystem::path in_file;
-std::filesystem::path out_file;
-
+unsigned int t;
+std::filesystem::path in_file = "";
+std::filesystem::path out_file = "";
 
 int handle_parameters(int argc, const char **argv)
 {
@@ -26,9 +23,11 @@ int handle_parameters(int argc, const char **argv)
     desc.add_options()("help", "produce help message")
     ("input,i", po::value<std::filesystem::path>(&in_file)->required(), "")
     ("output,o", po::value<std::filesystem::path>(&out_file), "")
-    ("context_length,l", po::value<unsigned int>(&l), "length of chunk and stored context");
-    
+    ("number,t", po::value<unsigned int>(&t), "number of patterns")
+    ("size,l", po::value<unsigned int>(&l), "length of patterns");
+
     po::positional_options_description posOptions;
+    posOptions.add("input", 1);
 
     po::variables_map vm;
 
@@ -44,7 +43,6 @@ int handle_parameters(int argc, const char **argv)
 
             return 1;
         }
-
 
         po::notify(vm);
     }
@@ -76,25 +74,24 @@ int main(int argc, char const *argv[])
         return EXIT_SUCCESS;
     }
 
+    //  setup out file
+    if (out_file.empty()){
+        out_file = in_file;
+        out_file.replace_extension(std::to_string(t)+"_"+std::to_string(l)+".patterns");
+    }
+    cout << out_file <<endl;
+
     ifstream ifs(in_file);
+    ofstream ofs(out_file);
     if (!ifs)  // If the file could not be opened, treat input as a sequence
     {
-        std::cout << "Error while reading input_file\n"
-                  << std::endl;
-        return EXIT_FAILURE;
+        cout << "Error: File was not found!" << endl;
+        return 1;
     }
-    else  // If the file can be opened, treat input as a file
-    {
-        // EDS eds(ifs);
-        // eds.stats();
-
-        // Bio_FMi index = Bio_FMi(eds,l);
-        Bio_FMi index = Bio_FMi(in_file,l);
-        index.build();
-        index.print_stats();
-            
     
-    }
+    EDS eds(ifs);
+    // eds.stats();
+    eds.gen_patterns(ofs,t,l);
     
     return 0;
 }

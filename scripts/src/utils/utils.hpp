@@ -1,11 +1,13 @@
-#ifndef TRANSFORM_H
-#define TRANSFORM_H
+#ifndef UTILS_H
+#define UTILS_H
 #include <filesystem>
 #include <string>
 #include <iostream>
 #include <fstream>
 #include <sys/resource.h>
 #include <sdsl/bit_vectors.hpp>
+#include <vector>
+#include <type_traits>
 
 void TODO()
 {
@@ -477,87 +479,154 @@ int vcf2leds()
     return 0;
 }
 
-int eds2leds(std::istream &in, std::ostream &out, unsigned int l)
+int eds2leds_cartesian(std::istream &in, std::ostream &out, unsigned int l)
 {
-    char ch;
-    bool count = true;
-    size_t cl = 0;
+    size_t cl = l - 1;
     bool first = true;
-    std::string line = "";
-    std::pair<uint64_t, uint64_t> Si = {0, 0};
-    std::pair<uint64_t, uint64_t> Sj = {0, 0};
-
     bool merge = false;
+    std::string line = "";
+    std::set<std::string> a;
+    std::set<std::string> b;
+    int counter = 0;
 
+    char ch;
     while (in.get(ch))
     {
-        // Process each character
         switch (ch)
         {
         case '{':
-            //  reset counter and stop counting
-            if (cl < l && !first)
+            // a set is open - may be degenerate or reference
+            if (!line.empty())
             {
-                Si.second += (Si.first * line.size());
-                merge = true;
-            }
-            else
-            {
-                //  ref
-                merge = false;
-            }
-
-            cl = 0;
-            count = false;
-            first = false;
-            line.clear();
-            break;
-        case '}':
-
-            Sj.first++;
-            Sj.second += line.size();
-            // std::cout << Sj.first << "," << Sj.second << std::endl;
-            // start counting
-            if (merge || Si.first == 0)
-            {
-                if (Si.first == 0)
+                // reference part without {}
+                if (line.size() < cl && !first)
                 {
-                    Si.first = Sj.first;
-                    Si.second = Sj.second;
+                    //  need to merges
+                    merge = true;
+                    for (auto change : a)
+                    {
+                        change.append(line);
+                    }
                 }
                 else
                 {
-                    Si.second = (Sj.first * Si.second) + (Si.first * Sj.second);
-                    Si.first = Si.first * Sj.first;
+                    //  flush reference part
+                    if (a.size() >1)
+                    {
+                        out << '{';
+                        for (auto change : a)
+                        {
+                            out << change << ',';
+                        }
+                        out.seekp(-1, std::ios::cur);
+                        out << '}';
+                    }
+                    else if (a.size() == 1)
+                    {
+                        out << *(a.begin());
+                    }
+                    out << line;
                 }
+                first = false;
+                line.clear();
+            }
+            counter = 1;
+            break;
+        case '}':
+            b.insert(line);
+            if (counter == 1)
+            {
+                //  reference
+                if (line.size() < cl && !first)
+                {
+                    //  need to merges
+                    merge = true;
+                    a = cartesian(a, b);
+                }
+                else
+                {
+                    //  flush reference part
+                    if (a.size() > 1)
+                    {
+                        out << '{';
+                        for (auto change : a)
+                        {
+                            out << change << ',';
+                        }
+                        out.seekp(-1, std::ios::cur);
+                        out << '}';
+                    }
+                    else if (a.size() == 1)
+                    {
+                        out << *(a.begin());
+                    }
+                    out << line;
+                }
+                first = false;
             }
             else
             {
-                //  flush
-                Si.first = 0;
-                Si.second = 0;
+                //  degenerate symbol
+                if (merge)
+                {
+                    a = cartesian(a, b);
+                    merge = false;
+                }
+                else
+                {
+                    a = b;
+                    if (first)
+                        first = false;
+                }
             }
-            count = true;
+            b.clear();
             line.clear();
-            Sj.first = 0;
-            Sj.second = 0;
-
-            // std::cout << Si.first << "," << Si.second << std::endl;
             break;
         case ',':
-            Sj.first++;
-            Sj.second += line.size();
+            b.insert(line);
             line.clear();
+            counter++;
+            break;
+        case '\n':
             break;
         default:
-            if (count)
-                cl++;
             line.push_back(ch);
             break;
         }
+    }
+    if (a.size() > 1)
+    {
+        out << '{';
+        for (auto change : a)
+        {
+            out << change << ',';
+        }
+        out.seekp(-1, std::ios::cur);
+        out << '}';
+    }
+
+    if (b.size() > 1)
+    {
+        out << '{';
+        for (auto change : b)
+        {
+            out << change << ',';
+        }
+        out.seekp(-1, std::ios::cur);
+        out << '}';
+    }
+    else if (b.size() == 1)
+    {
+        out << *(b.begin());
+    }
+
+    if (!line.empty())
+    {
+        // reference part without {}
+        out << line;
     }
 
     return 0;
 }
 
-#endif //   TRANSFORM_H
+#endif //   UTILS_H
