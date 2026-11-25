@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <cassert>
 
-#include "eds.hpp"
+#include "EDS.hpp"
 #include "index.hpp"
 #include "utils.hpp"
 
@@ -12,7 +12,8 @@ using namespace bio_fmi;
 
 /*  General EDS */
 void build_from_file() {
-    std::filesystem::path path = "/home/draesdom/Projects/bio-fmi/scripts/test/test.eds";
+    std::cout << " Build from file" << std::endl;
+    std::filesystem::path path = "../../test/test.eds";
     Bio_FMi index = Bio_FMi(path,1);
     index.build();
 
@@ -32,22 +33,31 @@ void build_from_eds() {
 
 void build_ref_files() {
     std::vector<unsigned> test_contexts = {3,5,10};
-    std::filesystem::path basepath = "./test.eds";
+    std::filesystem::path basepath = "../../test.eds";
     std::filesystem::path path;
 
     for (auto it: test_contexts)
     {
         path = basepath.replace_extension(std::to_string(it)+".leds");
-        std::cout << path;
+        std::cout << " Build with context: "<<it << " for " << path << std::endl;
         if(std::filesystem::exists(path)){
+            std::cout << "exists" << std::endl;
+            
             //  build the index
             Bio_FMi index = Bio_FMi(path,it);
             index.build();
             // index.print_stats();
         }else{
+            std::cout << "transforming" << std::endl;
             std::ifstream ifs(basepath);
             std::ofstream ofs(path);
+            if (!ifs)  // If the file could not be opened, treat input as a sequence
+            {
+                std::cout << "Error: File was not found!" << std::endl;
+            }
             eds2leds_cartesian(ifs,ofs,it);
+            ifs.close();
+            ofs.close();
             Bio_FMi index = Bio_FMi(path,it);
             index.build();
             // index.print_stats();

@@ -2,7 +2,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "utils/eds.hpp"
+#include "utils/EDS.hpp"
 #include "utils/index.hpp"
 
 #include <boost/program_options.hpp>

@@ -9,12 +9,27 @@
 using namespace std;
 namespace po = boost::program_options;
 
-std::string usage = "";
-std::string desc = "";
 std::string method;
 unsigned int l;
 std::filesystem::path in_file;
 std::filesystem::path out_file;
+std::filesystem::path sources;
+
+void usage(){
+    // cout << "./transform <input_file> [-o <output_file> | -s <source_file>] [--output=<output_file> | --source=<source_file> | --method={linear,cartesian}] " << endl;
+    cout << "Usage:\n";
+    cout << "  ./transform <input_file> [options]\n\n";
+    cout << "Options:\n";
+    cout << "  -o <output_file>         Specify the output file.\n";
+    cout << "  -s <source_file>         Specify the source file.\n";
+    cout << "  --output=<output_file>   Alternative way to specify the output file.\n";
+    cout << "  --source=<source_file>   Alternative way to specify the source file.\n";
+    cout << "  --method=METHOD          Transformation method to use. Available methods:\n";
+    cout << "                             - linear\n";
+    cout << "                             - cartesian\n";
+    cout << endl;
+
+}
 
 int check_extension(std::string ext){
     if (ext == ".msa"){
@@ -35,6 +50,7 @@ int handle_parameters(int argc, const char **argv)
     desc.add_options()("help", "produce help message")
     ("input,i", po::value<std::filesystem::path>(&in_file)->required(), "")
     ("output,o", po::value<std::filesystem::path>(&out_file), "")
+    ("sources,s", po::value<std::filesystem::path>(&sources), "")
     ("context_length,l", po::value<unsigned int>(&l), "length of chunk and stored context, default 5")
     ("method", po::value<std::string>(&method)->default_value("linear"), "specify method of creating eds");
 
@@ -49,10 +65,7 @@ int handle_parameters(int argc, const char **argv)
 
         if (vm.count("help"))
         {
-            std::cout << "Usage: " << argv[0] << " " << usage << std::endl
-                      << std::endl;
-            std::cout << desc << std::endl;
-
+            usage();
             return 1;
         }
 
@@ -139,13 +152,27 @@ int main(int argc, char const *argv[])
     case 3:
         /*  EDS */
         cout << "eds" << endl;
-        if (method == "linear"){
-            TODO();
+        if (method == "linear")
+        {
+            //  needs ifstream of sample sources - edp
+            if (sources.empty())
+            {
+                cerr << "Error: Option sources not found!" <<endl;
+                usage();
+                return EXIT_FAILURE;
+            }
+            ifstream iss(sources);
+            if (!iss.is_open())
+            {
+                cerr << "Error: Source file was not found!" << endl;
+                return EXIT_FAILURE;
+            }
+            ofstream oss(out_file.replace_extension(".edp"));
+            eds2leds_linear(ifs,ofs,l,iss,oss);
         }
         if(method == "cartesian"){
             eds2leds_cartesian(ifs,ofs,l);
         }
-
         break;
     default:
         cout << "Error: Unknow extension!" << endl;

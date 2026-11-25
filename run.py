@@ -47,7 +47,7 @@ def build(file,l):
 
 def locate(index, pattern_file):
     executable_path = f"{os.path.dirname(__file__)}/scripts/build/src/locate"
-    p = subprocess.Popen([executable_path,'-i',index,'-o',index_dir,'-l',str(l)], stdout=subprocess.PIPE)
+    p = subprocess.Popen([executable_path,'-i',index,'-P',pattern_file,'-l',str(l)], stdout=subprocess.PIPE)
 
 def parse_range(value):
     try:
@@ -86,11 +86,11 @@ def main():
     parser_build.add_argument("--rebuild", required=False, default=False, action='store_true', help="if minimized file already exists, it will be replaced by the new one")
 
     # Locate command
-    parser_locate = subparsers.add_parser("locate", help="find MEMs of given patterns with respect to the tree data")
+    parser_locate = subparsers.add_parser("locate", help="locate patterns")
     parser_locate.add_argument("index", nargs='+', type=str, help="path to the index directory")
     parser_locate.add_argument("-l","--context_length", required=True, type=int, help="context length")
-    parser_locate.add_argument("-p", "--pattern", nargs='+', type=str, help="Patterns")
-    parser_locate.add_argument("-P", "--pattern_files", nargs='+', type=str, help="A pattern file (one pattern per line)")
+    parser_locate.add_argument("-p", "--pattern", nargs='+',default=None, type=str, help="Patterns")
+    parser_locate.add_argument("-P", "--pattern_files", nargs='+', default=list(), type=str, help="A pattern file (one pattern per line)")
     parser_locate.add_argument("-o","--output", type=argparse.FileType('w'), default=sys.stdout, help="output file")
     # parser_locate.add_argument("--rebuild", required=False, default=False, action='store_true', help="if output file already exists, it will be replaced by the new one")
 
@@ -105,7 +105,10 @@ def main():
         for input in args.index:
             indices += glob.glob(input)
 
+            
         patterns = []
+        if args.pattern:
+            patterns.append(args.pattern)
         for pattern in args.pattern_files:
             patterns += glob.glob(pattern)
             

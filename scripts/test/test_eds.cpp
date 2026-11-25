@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <cassert>
 
-#include "eds.hpp"
+#include "EDS.hpp"
 
 
 /*  General EDS */

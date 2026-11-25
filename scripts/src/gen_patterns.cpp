@@ -4,7 +4,7 @@
 #include <fstream>
 #include <sys/resource.h>
 #include <boost/program_options.hpp>
-#include "utils/eds.hpp"
+#include "utils/EDS.hpp"
 
 using namespace std;
 namespace po = boost::program_options;

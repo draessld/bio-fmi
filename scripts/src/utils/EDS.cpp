@@ -1,8 +1,7 @@
-#include "eds.hpp"
+#include "EDS.hpp"
 
 EDS::EDS(std::istream &is)
 {
-
     unsigned int local_m = 0; //  number string in a set
     std::string line;
 
@@ -202,7 +201,7 @@ int EDS::stats()
         std::cout << b << ", ";
     }
     std::cout << std::endl;
-    
+
     std::cout << "base_position:" << base_position.size() << std::endl;
     for (auto bp : base_position)
     {
@@ -216,7 +215,7 @@ int EDS::stats()
         std::cout << bp << ", ";
     }
     std::cout << std::endl;
-    
+
     std::cout << "lengths:" << lengths.size() << std::endl;
     for (auto l : lengths)
     {
@@ -282,10 +281,10 @@ int EDS::gen_pattern(std::ostream &os, unsigned int size)
     unsigned int rset;
     unsigned int rstr;
     unsigned int rpos;
-    
+
     unsigned int spos;
     std::vector<int> uch;
-    
+
     int attemps = 50;
     std::string res;
     std::string tmp;
@@ -297,21 +296,24 @@ int EDS::gen_pattern(std::ostream &os, unsigned int size)
         // std::cout << rset << ", "<< set_size[rset]<<std::endl;
         rstr = get_random_position(set_size[rset]); //  get random string in set
         // std::cout << rstr <<", " << changes[cum_set_size[rset] - rstr].size()<< std::endl;
-        rpos = get_random_position(changes[cum_set_size[rset] -1- rstr].size()); // get random position in string
+        rpos = get_random_position(changes[cum_set_size[rset] - 1 - rstr].size()); // get random position in string
         // std::cout << rpos << std::endl;
         // std::cout << "startign position:" << ref_position[cum_set_size[rset] - rstr] + rpos << std::endl;
-        spos = ref_position[cum_set_size[rset] -1 - rstr] + rpos;
+        spos = ref_position[cum_set_size[rset] - 1 - rstr] + rpos;
 
         while (rset < n - 1)
         {
-            if (abs_change_number[cum_set_size[rset]-1 - rstr] !=-1){
-            if(uch.empty()){
-                uch.push_back(abs_change_number[cum_set_size[rset] -1- rstr]);
-            }else if(uch.back() != abs_change_number[cum_set_size[rset]-1 - rstr])
-                uch.push_back(abs_change_number[cum_set_size[rset]-1 - rstr]);
+            if (abs_change_number[cum_set_size[rset] - 1 - rstr] != -1)
+            {
+                if (uch.empty())
+                {
+                    uch.push_back(abs_change_number[cum_set_size[rset] - 1 - rstr]);
+                }
+                else if (uch.back() != abs_change_number[cum_set_size[rset] - 1 - rstr])
+                    uch.push_back(abs_change_number[cum_set_size[rset] - 1 - rstr]);
             }
-            
-            tmp = changes[cum_set_size[rset] -1- rstr];
+
+            tmp = changes[cum_set_size[rset] - 1 - rstr];
             // std::cout << tmp << ',' << rpos << ',' << (res.size()+tmp.size()-rpos) << std::endl;
             if ((res.size() + tmp.size() - rpos) < size)
             {
@@ -334,17 +336,17 @@ int EDS::gen_pattern(std::ostream &os, unsigned int size)
                 // std::cout << tmp.substr(rpos, size - res.size())<< std::endl;
                 res.append(tmp.substr(rpos, size - res.size()));
                 // std::cout << "done" << std::endl;
-                std::cout << spos+1 << "[";
-                    for (auto ch: uch)
-                    {
-                        std::cout << ch+1 << ' ';
-                    }
+                std::cout << spos + 1 << "[";
+                for (auto ch : uch)
+                {
+                    std::cout << ch + 1 << ' ';
+                }
                 std::cout << "]\n";
                 os << res << '\n';
                 return 0;
             }
         }
-        // std::cout <<"reset" << std::endl; 
+        // std::cout <<"reset" << std::endl;
         attemps--;
     }
     std::cout << "unsucessful" << std::endl;
@@ -360,19 +362,21 @@ void EDS::gen_patterns(std::ostream &os, unsigned int t, unsigned int size)
     }
 }
 
-
-void EDS::extract(unsigned int position, std::vector<unsigned int> changes){
-    unsigned int upp,low;
+void EDS::extract(unsigned int position, std::vector<unsigned int> changes)
+{
+    unsigned int upp, low;
     upp = ref_position.size();
     low = 0;
     unsigned int pivot;
-    while (upp>low)
+    while (upp > low)
     {
-        pivot = (upp-low)/2;
+        pivot = (upp - low) / 2;
         if (ref_position[pivot] < position)
         {
             low = pivot;
-        }else{
+        }
+        else
+        {
             upp = pivot;
         }
     }
@@ -380,7 +384,6 @@ void EDS::extract(unsigned int position, std::vector<unsigned int> changes){
     position = base_position[low] + (position - ref_position[low]);
     std::cout << "File position: " << ref_position[low] << std::endl;
 }
-
 
 void EDS::language(std::ostream &os)
 {

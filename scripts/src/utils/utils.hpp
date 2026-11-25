@@ -1,6 +1,5 @@
 #ifndef UTILS_H
 #define UTILS_H
-#include <filesystem>
 #include <string>
 #include <iostream>
 #include <fstream>
@@ -8,11 +7,29 @@
 #include <sdsl/bit_vectors.hpp>
 #include <vector>
 #include <type_traits>
+#include <bitset>
+// #include "SourceManager.cpp"
+
+#define MAXBITS 1024
 
 void TODO()
 {
     std::cout << "Error: Not implemented!" << std::endl;
     exit(1);
+}
+
+void printch(std::set<std::string> &a)
+{
+    for (auto &c : a)
+        std::cout << c << ", ";
+    std::cout << std::endl;
+}
+
+void printch(std::vector<std::string> &a)
+{
+    for (auto &c : a)
+        std::cout << c << ", ";
+    std::cout << std::endl;
 }
 
 std::set<std::string> cartesian(std::set<std::string> &a, std::set<std::string> &b)
@@ -26,6 +43,54 @@ std::set<std::string> cartesian(std::set<std::string> &a, std::set<std::string> 
         return b;
 
     return res;
+}
+
+std::vector<std::string> match_variants(std::vector<std::string> &a, std::vector<std::string> &b, std::istream &in_source, int var_counter, int nsources)
+{
+    //  check if tmp file exists - change var_count and read from it
+    const std::filesystem::path tmpfile("./tmp.out");
+    std::fstream tmp(tmpfile,std::ios::in | std::ios::out | std::ios::binary);
+    tmp.seekg(0, std::ios::end);
+    std::streampos endPos = tmp.tellg();
+    std::streampos pos = endPos;
+    if(!tmp.is_open()){
+        std::cerr<<"Error: open tmp files was not possible" << std::endl;
+    }
+    std::vector<std::string> result;
+    std::vector<std::string> outps;
+    std::string line;
+    for (int x = 0; x < b.size(); x++)
+    {
+        // std::cout << "b:" << x << "=" << b[x] << std::endl;
+        // std::cout << (var_counter - (b.size()-x)) * nsources + (var_counter-(b.size()-x)) << std::endl;
+        in_source.seekg((var_counter - (b.size()-x)) * nsources + (var_counter-(b.size()-x)), std::ios::beg);
+        std::getline(in_source,line);
+        std::bitset<MAXBITS> bitsb(line);
+        for (int y = 0; y < a.size(); y++)
+        {
+            // std::cout << "a:" << y << "=" << a[y] << std::endl;
+            // std::cout << (var_counter - b.size()-(a.size()-y)) * nsources + (var_counter - b.size()-(a.size()-y)) << std::endl;
+            tmp.seekg((var_counter - b.size()-(a.size()-y)) * nsources + (var_counter - b.size()-(a.size()-y)), std::ios::beg); //    jump onto line with sources
+            std::getline(tmp, line);
+            std::bitset<MAXBITS> bitsa(line);
+            auto res = bitsa & bitsb; //  which sources they share
+            if (!res.none())
+            {
+                //  add variant merge
+                result.push_back(a[y] + b[x]);
+                outps.push_back(res.to_string().substr(MAXBITS-nsources,nsources));
+            }
+        }
+    }
+
+    tmp.seekp((var_counter - b.size()-a.size()) * nsources + (var_counter - b.size()-a.size()), std::ios::beg);    //  TODO move to the position in the file
+    for (auto source: outps)
+    {
+        tmp << source << std::endl; //  rewrite old sources
+    }
+    tmp.close();
+
+    return result;
 }
 
 /*  Transformation fucntion */
@@ -467,9 +532,9 @@ int msa2leds_cartesian(std::istream &in, std::ostream &out, unsigned int l)
     return 0;
 }
 
-int vcf2eds()
+int vcf2eds(std::istream &fastas, std::istream &vcfs, std::ostream &out, unsigned int l)
 {
-    TODO();
+
     return 0;
 }
 
@@ -511,7 +576,7 @@ int eds2leds_cartesian(std::istream &in, std::ostream &out, unsigned int l)
                 else
                 {
                     //  flush reference part
-                    if (a.size() >1)
+                    if (a.size() > 1)
                     {
                         out << '{';
                         for (auto change : a)
@@ -574,9 +639,18 @@ int eds2leds_cartesian(std::istream &in, std::ostream &out, unsigned int l)
                 }
                 else
                 {
-                    a = b;
-                    if (first)
+                    if (first){
+                        //  store a into tmp
+                        // std::ofstream tmp("./tmp.out");
+                        // for (int i=0;i<a.size();i++){
+                        //     in_source.seekg(i*nsources + i);
+                        //     std::getline(in_source,line);
+                        //     tmp << line;
+                        // }
+                        // tmp.close();
                         first = false;
+                    }
+                    a = b;
                 }
             }
             b.clear();
@@ -584,6 +658,194 @@ int eds2leds_cartesian(std::istream &in, std::ostream &out, unsigned int l)
             break;
         case ',':
             b.insert(line);
+            line.clear();
+            counter++;
+            break;
+        case '\n':
+            break;
+        default:
+            line.push_back(ch);
+            break;
+        }
+    }
+    if (a.size() > 1)
+    {
+        out << '{';
+        for (auto change : a)
+        {
+            out << change << ',';
+        }
+        out.seekp(-1, std::ios::cur);
+        out << '}';
+    }
+
+    if (b.size() > 1)
+    {
+        out << '{';
+        for (auto change : b)
+        {
+            out << change << ',';
+        }
+        out.seekp(-1, std::ios::cur);
+        out << '}';
+    }
+    else if (b.size() == 1)
+    {
+        out << *(b.begin());
+    }
+
+    if (!line.empty())
+    {
+        // reference part without {}
+        out << line;
+    }
+
+    return 0;
+}
+
+int eds2leds_linear(std::istream &in, std::ostream &out, unsigned int l, std::istream &in_source, std::ostream &out_source)
+{
+    std::cout << "linear EDS2lEDS" << std::endl;
+    const std::filesystem::path tmpfile("./tmp.out");
+    std::ofstream tmp;
+    size_t cl = l - 1;
+    bool first = true;
+    bool merge = false;
+    std::string line = "";
+    std::string slinea, slineb;
+    std::vector<std::string> a;
+    std::vector<std::string> b;
+    int counter = 0;
+    int var_counter = 0; //  to track number of
+
+    std::filesystem::remove(tmpfile);
+
+    std::getline(in_source, slinea); //  first variant is always reference
+    int nsources = slinea.size();
+
+    char ch;
+    while (in.get(ch))
+    {
+        switch (ch)
+        {
+        case '{':
+            // a set is open - may be degenerate or reference
+            if (!line.empty())
+            {
+                // reference part without {}
+                if (line.size() < cl && !first)
+                {
+                    //  need to merges
+                    merge = true;
+                    for (auto change : a)
+                        change.append(line);
+                }
+                else
+                {
+                    //  flush reference part
+                    if (a.size() > 1)
+                    {
+                        out << '{';
+                        for (auto change : a)
+                        {
+                            out << change << ',';
+                        }
+                        out.seekp(-1, std::ios::cur);
+                        out << '}';
+                    }
+                    else if (a.size() == 1)
+                    {
+                        out << *(a.begin());
+                    }
+                    out << line;
+                }
+                first = false;
+                line.clear();
+            }
+
+            counter = 1;
+            break;
+        case '}':
+            b.push_back(line);
+            if (counter == 1)
+            {
+                //  reference with {}
+                if (line.size() < cl && !first)
+                {
+                    //  need to merges
+                    merge = true;
+                    //append reference to the variant in a
+                    for (auto &change: a)
+                        change.append(line);     
+                }
+                else
+                {
+                    //  flush reference part
+                    if (a.size() > 1)
+                    {
+
+                        // std::cout << "Flushing previous set: " << std::endl;
+                        // printch(a);
+
+                        out << '{';
+                        for (auto change : a)
+                        {
+                            out << change << ',';
+                        }
+                        out.seekp(-1, std::ios::cur);
+                        out << '}';
+
+                    }
+                    else if (a.size() == 1)
+                    {
+                        //????  reference stored in change set
+                        out << *(a.begin());
+                    }
+                    out << line;
+                }
+                first = false;
+            }
+            else
+            {
+                //  degenerate symbol
+                if (merge)
+                {                    
+                    var_counter -= a.size();
+                    a = match_variants(a, b, in_source, var_counter+a.size()+b.size(), nsources);
+                    var_counter += a.size();
+                    merge = false;
+                }
+                else
+                {
+                    var_counter+=counter;
+                    //  store a into tmp
+                    tmp.open(tmpfile,std::ios::app);
+                    if (first){
+                        tmp.seekp(0,std::ios::beg);
+                        for (int i=0;i<b.size();i++){
+                            in_source.seekg(i*nsources + i);
+                            std::getline(in_source,line);
+                            tmp << line << std::endl;
+                        }
+                        first = false;
+                    }else{
+                        tmp.seekp(0,std::ios::end); //  start on the end of file
+                        for (int i=b.size();i>0;i--){
+                            in_source.seekg((var_counter-i)*nsources + (var_counter-i));
+                            std::getline(in_source,line);
+                            tmp << line << std::endl;
+                        }
+                    }
+                    tmp.close();
+                    a = b;
+                }
+            }
+            b.clear();
+            line.clear();
+            break;
+        case ',':
+            // var_counter++;
+            b.push_back(line);
             line.clear();
             counter++;
             break;

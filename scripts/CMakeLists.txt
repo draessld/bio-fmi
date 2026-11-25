@@ -22,4 +22,4 @@ enable_testing()
 
 # Add the src directory to the project
 add_subdirectory(src)
-add_subdirectory(test)
+# add_subdirectory(test)

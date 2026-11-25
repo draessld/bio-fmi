@@ -1,12 +1,17 @@
-#ifndef EDS_H
-#define EDS_H
+
 
 #include <iostream>
+#include <fstream>
 #include <filesystem>
 #include <vector>
 #include <random>
 #include <algorithm>
+#include <bitset>
 
+#define MAXBITS 1024
+
+#ifndef EDS_H
+#define EDS_H
 class EDS{
     //  Accepts an elastic-degenerate string (EDS) in format {ACTAG,AGATA}{,ATCC}{ATTTTAA,AGGCGCC,AGAT}{,ATTT,CGCGC}... => every set is closed in curly brackets, strings in set divided by ',' an a size of empty string is supposed to be 0 => total N is 
     private:

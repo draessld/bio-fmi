@@ -10,7 +10,7 @@
 #include <bits/stdc++.h>
 
 #include <sdsl/suffix_arrays.hpp>
-#include "eds.hpp"
+#include "EDS.hpp"
 
 using namespace sdsl;
 
